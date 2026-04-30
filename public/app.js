@@ -34,7 +34,7 @@ const applyTheme = (theme) => {
   root.setAttribute("data-theme", theme);
   
   // Update titles for all toggles
-  const label = theme === "dark" ? "Chế độ sáng" : "Chế độ tối";
+  const label = theme === "dark" ? "Chuyển sang nền sáng" : "Chuyển sang nền tối";
   themeToggles.forEach(btn => {
     btn.title = label;
     btn.setAttribute("aria-label", label);

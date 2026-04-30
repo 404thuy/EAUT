@@ -335,9 +335,12 @@ html, body {
   flex-shrink: 0;
 }
 
-.theme-icon-light { display: none; }
-[data-theme="light"] .theme-icon-light { display: inline-block; }
-[data-theme="light"] .theme-icon-dark { display: none; }
+/* Theme Icons Logic (Action model: show Sun when Dark, Moon when Light) */
+.theme-icon-light { display: inline-block; }
+.theme-icon-dark { display: none; }
+
+[data-theme="light"] .theme-icon-light { display: none; }
+[data-theme="light"] .theme-icon-dark { display: inline-block; }
 
 .user-menu summary::-webkit-details-marker {
   display: none;
