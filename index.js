@@ -1,4 +1,5 @@
 const path = require("path");
+const express = require("express");
 const cookieSession = require("cookie-session");
 const dotenv = require("dotenv");
 const { getStudentSchedule, getStudentTermSchedule, getStudentExamSchedule } = require("./services/eautClient");
