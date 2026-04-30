@@ -201,7 +201,7 @@ app.get("/schedule/all", async (req, res) => {
 });
 
 app.get("/logout", (req, res) => {
-  req.session.destroy();
+  req.session = null;
   res.redirect("/");
 });
 

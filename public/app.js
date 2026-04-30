@@ -26,12 +26,19 @@ if (sidebarToggle && sidebar) {
 }
 
 // Dark mode (persisted)
-const themeToggle = $("[data-theme-toggle]");
+const themeToggles = $$("[data-theme-toggle]");
 const THEME_KEY = "eaut_theme";
 
 const applyTheme = (theme) => {
   const root = document.documentElement;
   root.setAttribute("data-theme", theme);
+  
+  // Update titles for all toggles
+  const label = theme === "dark" ? "Chế độ sáng" : "Chế độ tối";
+  themeToggles.forEach(btn => {
+    btn.title = label;
+    btn.setAttribute("aria-label", label);
+  });
 };
 
 const getPreferredTheme = () => {
@@ -42,14 +49,14 @@ const getPreferredTheme = () => {
 
 applyTheme(getPreferredTheme());
 
-if (themeToggle) {
-  themeToggle.addEventListener("click", () => {
-    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-    const next = isDark ? "light" : "dark";
+themeToggles.forEach(btn => {
+  btn.addEventListener("click", () => {
+    const current = document.documentElement.getAttribute("data-theme") || "dark";
+    const next = current === "dark" ? "light" : "dark";
     localStorage.setItem(THEME_KEY, next);
     applyTheme(next);
   });
-}
+});
 
 const viewButtons = $$("[data-view-mode]");
 const viewBlocks = $$("[data-view-block]");
