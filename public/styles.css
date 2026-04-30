@@ -15,9 +15,8 @@
   --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Dark Theme (Default) - Applied only if data-theme is not 'light' */
-html:not([data-theme="light"]), 
-:root:not([data-theme="light"]) {
+/* Theme variables: Dark (Default) and Light (Sun) */
+:root {
   color-scheme: dark;
   --bg-deep: #080a16;
   --bg-main: #0d1127;
@@ -42,9 +41,6 @@ html:not([data-theme="light"]),
   --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 
-/* Light Theme Overrides - High Priority */
-html[data-theme="light"], 
-body[data-theme="light"],
 [data-theme="light"] {
   color-scheme: light !important;
   --bg-deep: #ffffff !important;
