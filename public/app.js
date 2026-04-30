@@ -30,6 +30,7 @@ const themeToggles = $$("[data-theme-toggle]");
 const THEME_KEY = "eaut_theme";
 
 const applyTheme = (theme) => {
+  console.log(`[Theme] Applying: ${theme}`);
   const root = document.documentElement;
   root.setAttribute("data-theme", theme);
   

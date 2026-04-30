@@ -4,51 +4,45 @@
 */
 
 :root {
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --sidebar-width: 240px;
+  --header-height: 60px;
+  --blur: blur(12px);
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dark Theme (Default) */
+html, :root {
   color-scheme: dark;
-  
-  /* Core Colors */
   --bg-deep: #080a16;
   --bg-main: #0d1127;
   --bg-sidebar: #0a0d1f;
   --surface: #151a36;
+  --surface-solid: #151a36;
   --surface-hover: #1c2242;
-  
-  /* Brand Colors */
   --primary: #7c8bff;
   --primary-glow: rgba(124, 139, 255, 0.4);
   --accent-pink: #ff8ec2;
   --accent-blue: #70d6ff;
   --accent-purple: #9d8df1;
-  
-  /* Status Colors */
   --success: #63e2b7;
   --error: #e88080;
   --warning: #f2c97d;
-  
-  /* Text Colors */
   --text-main: #f6f8ff;
   --text-muted: rgba(246, 248, 255, 0.65);
   --text-dim: rgba(246, 248, 255, 0.45);
-  
-  /* Layout & Decor */
   --line: rgba(170, 185, 255, 0.12);
   --line-bright: rgba(170, 185, 255, 0.25);
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
-  
-  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 12px 30px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
-  
-  --sidebar-width: 240px;
-  --header-height: 60px;
-  --blur: blur(12px);
-  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-[data-theme="light"] {
+/* Light Theme Overrides */
+html[data-theme="light"] {
   color-scheme: light;
   --bg-deep: #ffffff;
   --bg-main: #ffffff;
@@ -112,7 +106,7 @@ html, body {
   height: 100vh;
   padding: 2rem 1.25rem;
   z-index: 1000;
-  transition: var(--transition);
+  transition: transform var(--transition), opacity var(--transition);
 }
 
 .sidebar-brand {
@@ -166,7 +160,7 @@ html, body {
   text-decoration: none;
   font-weight: 700;
   font-size: 0.85rem;
-  transition: var(--transition);
+  transition: transform var(--transition), opacity var(--transition);
 }
 
 .nav-item:hover {
@@ -274,7 +268,7 @@ html, body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: var(--transition);
+  transition: transform var(--transition), opacity var(--transition);
   font-size: 1.4rem;
   color: var(--text-main);
 }
@@ -475,7 +469,7 @@ html, body {
   font-family: inherit;
   cursor: pointer;
   border: none;
-  transition: var(--transition);
+  transition: transform var(--transition), opacity var(--transition);
   text-decoration: none;
   font-size: 0.85rem;
   gap: 0.4rem;
@@ -705,7 +699,7 @@ select, input {
   padding: 0.6rem;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  transition: var(--transition);
+  transition: transform var(--transition), opacity var(--transition);
   cursor: default;
 }
 
@@ -896,7 +890,7 @@ select, input {
   padding: 1rem;
   display: flex;
   gap: 1.25rem;
-  transition: var(--transition);
+  transition: transform var(--transition), opacity var(--transition);
   border-left: 4px solid var(--accent, var(--primary));
 }
 
@@ -977,7 +971,7 @@ select, input {
   border-radius: var(--radius-md);
   padding: 1rem;
   border-left: 4px solid var(--accent, var(--primary));
-  transition: var(--transition);
+  transition: transform var(--transition), opacity var(--transition);
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
