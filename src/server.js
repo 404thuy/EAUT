@@ -34,6 +34,10 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get("/health", (req, res) => {
+  res.send("Server is healthy");
+});
+
 app.get("/", (_req, res) => {
   res.render("index", {
     error: null,
