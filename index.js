@@ -23,6 +23,10 @@ app.use(
   })
 );
 
+app.get("/favicon.ico", (req, res) => res.sendFile(path.join(__dirname, "public", "favicon.png")));
+app.get("/favicon.png", (req, res) => res.sendFile(path.join(__dirname, "public", "favicon.png")));
+
+
 // Disable caching for all routes to ensure fresh data
 app.use((req, res, next) => {
   res.header("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -74,6 +78,7 @@ app.post("/schedule", async (req, res) => {
 
     return res.redirect("/schedule/week");
   } catch (error) {
+    console.error("SCHEDULE POST ERROR:", error);
     return res.status(500).render("index", {
       error: error.message || "Khong the lay lich hoc tu he thong EAUT.",
       result: null,
@@ -106,6 +111,7 @@ app.get("/schedule/week", async (req, res) => {
       formData: { username: saved.username, password: saved.password },
     });
   } catch (error) {
+    console.error("WEEK SCHEDULE ERROR:", error);
     return res.status(500).render("index", {
       error: error.message || "Không thể chuyển tuần học.",
       result: null,
@@ -135,6 +141,7 @@ app.get("/schedule/term", async (req, res) => {
       formData: { username: saved.username, password: saved.password },
     });
   } catch (error) {
+    console.error("TERM SCHEDULE ERROR:", error);
     return res.status(500).render("index", {
       error: error.message || "Không thể lấy lịch học kỳ.",
       result: null,
