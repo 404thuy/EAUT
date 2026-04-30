@@ -33,6 +33,7 @@ const applyTheme = (theme) => {
   console.log(`[Theme] Applying: ${theme}`);
   const root = document.documentElement;
   root.setAttribute("data-theme", theme);
+  document.body.setAttribute("data-theme", theme);
   
   // Update titles for all toggles
   const label = theme === "dark" ? "Chuyển sang nền sáng" : "Chuyển sang nền tối";
