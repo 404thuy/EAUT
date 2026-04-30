@@ -208,6 +208,16 @@ app.get("/logout", (req, res) => {
   res.redirect("/");
 });
 
+// Global error handler for debugging
+app.use((err, req, res, next) => {
+  console.error("DEBUG ERROR:", err);
+  res.status(500).json({
+    error: "Internal Server Error",
+    message: err.message,
+    stack: process.env.NODE_ENV === "production" ? null : err.stack
+  });
+});
+
 if (process.env.NODE_ENV !== "production") {
   app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
