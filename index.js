@@ -3,6 +3,7 @@ const express = require("express");
 const cookieSession = require("cookie-session");
 const dotenv = require("dotenv");
 const { getStudentSchedule, getStudentTermSchedule, getStudentExamSchedule } = require("./services/eautClient");
+const { CookieJar } = require("tough-cookie");
 
 dotenv.config();
 
@@ -22,6 +23,24 @@ app.use(
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   })
 );
+
+// Helpers for session persistence
+function getJar(req) {
+  if (req.session.jarData) {
+    try {
+      return CookieJar.fromJSON(req.session.jarData);
+    } catch (_e) {
+      return new CookieJar();
+    }
+  }
+  return new CookieJar();
+}
+
+function saveJar(req, jar) {
+  if (jar) {
+    req.session.jarData = JSON.stringify(jar.toJSON());
+  }
+}
 
 // Disable caching for all routes to ensure fresh data
 app.use((req, res, next) => {
@@ -87,7 +106,6 @@ app.get("/schedule", (req, res) => {
 });
 
 app.get("/schedule/week", async (req, res) => {
-  const selectedWeek = req.query.week || "";
   const saved = req.session.studentLogin;
 
   if (!saved?.username || !saved?.password) {
@@ -95,11 +113,14 @@ app.get("/schedule/week", async (req, res) => {
   }
 
   try {
+    const jar = getJar(req);
     const result = await getStudentSchedule(saved.username, saved.password, {
-      preferredWeek: selectedWeek,
+      preferredWeek: req.query.week || null,
       strictWeek: true,
-      useCache: !req.query.refresh,
+      jar
     });
+    saveJar(req, jar);
+    
     return res.render("index", {
       error: null,
       result: { ...result, viewType: "week" },
@@ -123,12 +144,15 @@ app.get("/schedule/term", async (req, res) => {
   }
 
   try {
+    const jar = getJar(req);
     const isAll = selectedSemester === "all";
     const result = await getStudentTermSchedule(saved.username, saved.password, {
       preferredSemester: isAll ? "" : selectedSemester,
       fetchAll: isAll,
-      useCache: !req.query.refresh,
+      jar
     });
+    saveJar(req, jar);
+
     return res.render("index", {
       error: null,
       result: { ...result, viewType: "term", selectedSemester },
@@ -152,12 +176,15 @@ app.get("/schedule/exam", async (req, res) => {
   }
 
   try {
+    const jar = getJar(req);
     const isAll = selectedSemester === "all";
     const result = await getStudentExamSchedule(saved.username, saved.password, {
       preferredSemester: isAll ? "" : selectedSemester,
       fetchAll: isAll,
-      useCache: !req.query.refresh,
+      jar
     });
+    saveJar(req, jar);
+
     return res.render("index", {
       error: null,
       result: { ...result, viewType: "exam", selectedSemester },
@@ -178,8 +205,11 @@ app.get("/schedule/all", async (req, res) => {
     return res.redirect("/");
   }
   try {
-    const weeklyResult = await getStudentSchedule(saved.username, saved.password, { preferredWeek: null, strictWeek: false });
-    const termResult = await getStudentTermSchedule(saved.username, saved.password, { fetchAll: false });
+    const jar = getJar(req);
+    const weeklyResult = await getStudentSchedule(saved.username, saved.password, { preferredWeek: null, strictWeek: false, jar });
+    const termResult = await getStudentTermSchedule(saved.username, saved.password, { fetchAll: false, jar });
+    saveJar(req, jar);
+
     // Merge results into a single object
     const result = {
       viewType: "combined",
