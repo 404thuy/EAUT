@@ -46,19 +46,19 @@ html.light-theme {
   color-scheme: light !important;
   --bg-deep: #ffffff !important;
   --bg-main: #ffffff !important;
-  --bg-sidebar: #f8faff !important;
-  --surface: #f0f2f9 !important;
+  --bg-sidebar: #f9fafb !important;
+  --surface: #f3f4f6 !important;
   --surface-solid: #ffffff !important;
-  --surface-hover: #e8ebf5 !important;
-  --primary: #5c6bc0 !important;
-  --primary-glow: rgba(92, 107, 192, 0.2) !important;
-  --text-main: #1a1f36 !important;
-  --text-muted: #4f566b !important;
-  --text-dim: #a3acb9 !important;
-  --line: rgba(92, 107, 192, 0.1) !important;
-  --line-bright: rgba(92, 107, 192, 0.2) !important;
-  --shadow-md: 0 10px 25px rgba(92, 107, 192, 0.1) !important;
-  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.1) !important;
+  --surface-hover: #e5e7eb !important;
+  --primary: #4f46e5 !important;
+  --primary-glow: rgba(79, 70, 229, 0.1) !important;
+  --text-main: #111827 !important;
+  --text-muted: #374151 !important;
+  --text-dim: #6b7280 !important;
+  --line: rgba(0, 0, 0, 0.08) !important;
+  --line-bright: rgba(0, 0, 0, 0.15) !important;
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+  --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.08) !important;
 }
 
 /* Force backgrounds in light mode */
