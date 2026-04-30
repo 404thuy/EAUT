@@ -121,6 +121,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/styles.css" />
+    <script>
+      (function() {
+        const saved = localStorage.getItem("eaut_theme");
+        const theme = (saved === "dark" || saved === "light") ? saved : (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
   </head>
   <body>
     <div class="app-shell">
