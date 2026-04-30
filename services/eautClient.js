@@ -4,6 +4,12 @@ const cheerio = require("cheerio");
 const { CookieJar } = require("tough-cookie");
 const https = require("https");
 
+const httpsAgent = new https.Agent({ 
+  keepAlive: true, 
+  maxSockets: 25,
+  keepAliveMsecs: 1000 
+});
+
 // Simple in-memory cache for schedule data
 // Key format: `${username}|${type}|${JSON.stringify(options)}`
 const scheduleCache = new Map();
@@ -126,11 +132,16 @@ function resolveActionUrl($, formNode) {
 
 async function performLogin(client, username, password) {
   let loginPage = null;
-  for (const candidatePath of LOGIN_PATH_CANDIDATES) {
-    try {
-      loginPage = await client.get(new URL(candidatePath, BASE_URL).toString());
-      break;
-    } catch (_e) {}
+  // Try the primary login path first without the loop if possible
+  try {
+    loginPage = await client.get(new URL(LOGIN_PATH, BASE_URL).toString());
+  } catch (err) {
+    for (const candidatePath of LOGIN_PATH_CANDIDATES.filter(p => p !== LOGIN_PATH)) {
+      try {
+        loginPage = await client.get(new URL(candidatePath, BASE_URL).toString());
+        break;
+      } catch (_e) {}
+    }
   }
 
   if (!loginPage) throw new Error("Không thể truy cập trang đăng nhập EAUT.");
@@ -720,12 +731,14 @@ async function getStudentSchedule(username, password, options = {}) {
   const client = wrapper(
     axios.create({
       jar,
+      httpsAgent,
       withCredentials: true,
       maxRedirects: 5,
-      timeout: 30000,
+      timeout: 20000,
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36",
+        "Connection": "keep-alive"
       },
     })
   );
@@ -847,12 +860,14 @@ async function getStudentTermSchedule(username, password, options = {}) {
   const client = wrapper(
     axios.create({
       jar,
+      httpsAgent,
       withCredentials: true,
       maxRedirects: 5,
-      timeout: 30000,
+      timeout: 20000,
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36",
+        "Connection": "keep-alive"
       },
     })
   );
@@ -943,12 +958,14 @@ async function getStudentExamSchedule(username, password, options = {}) {
   const client = wrapper(
     axios.create({
       jar,
+      httpsAgent,
       withCredentials: true,
       maxRedirects: 5,
-      timeout: 30000,
+      timeout: 20000,
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36",
+        "Connection": "keep-alive"
       },
     })
   );
@@ -988,7 +1005,10 @@ async function getStudentExamSchedule(username, password, options = {}) {
           const fieldName = sem.fieldName || "drpHocKy";
           const payload = { ...currentHidden, __EVENTTARGET: fieldName, __EVENTARGUMENT: "", [fieldName]: sem.value };
           const resp = await client.post(examUrl, new URLSearchParams(payload).toString(), {
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            headers: { 
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Connection": "keep-alive"
+            },
           });
           const $sem = cheerio.load(resp.data);
           // Update hidden fields for the next request in sequence
@@ -1032,7 +1052,10 @@ async function getStudentExamSchedule(username, password, options = {}) {
         const payload = { ...hidden, __EVENTTARGET: fieldName, __EVENTARGUMENT: "", [fieldName]: targetVal };
         try {
           const resp = await client.post(examUrl, new URLSearchParams(payload).toString(), {
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            headers: { 
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Connection": "keep-alive"
+            },
           });
           finalSchedule = extractExamScheduleFromGrid(cheerio.load(resp.data));
         } catch (_e) {}
