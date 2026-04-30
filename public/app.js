@@ -32,8 +32,12 @@ const THEME_KEY = "eaut_theme";
 const applyTheme = (theme) => {
   console.log(`[Theme] Applying: ${theme}`);
   const root = document.documentElement;
+  const isLight = theme === "light";
+  root.classList.toggle("light-theme", isLight);
+  document.body.classList.toggle("light-theme", isLight);
+  
+  // Backwards compatibility for logic that might use attributes
   root.setAttribute("data-theme", theme);
-  document.body.setAttribute("data-theme", theme);
   
   // Update titles for all toggles
   const label = theme === "dark" ? "Chuyển sang nền sáng" : "Chuyển sang nền tối";

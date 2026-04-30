@@ -41,7 +41,8 @@
   --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 
-[data-theme="light"] {
+/* Light Theme Overrides - High Priority Class */
+html.light-theme {
   color-scheme: light !important;
   --bg-deep: #ffffff !important;
   --bg-main: #ffffff !important;
@@ -59,6 +60,23 @@
   --shadow-md: 0 10px 25px rgba(92, 107, 192, 0.1) !important;
   --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.1) !important;
 }
+
+/* Force backgrounds in light mode */
+html.light-theme, 
+html.light-theme body, 
+html.light-theme .app-main, 
+html.light-theme .site-header, 
+html.light-theme .sidebar,
+html.light-theme .app-shell,
+html.light-theme .app-layout {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  color: var(--text-main) !important;
+}
+
+/* Force icon visibility in light mode */
+html.light-theme .theme-icon-dark { display: none !important; }
+html.light-theme .theme-icon-light { display: inline-block !important; }
 
 /* Base */
 * { box-sizing: border-box; }
@@ -331,9 +349,6 @@ html, body {
 /* Theme Icons Logic (Status model: show Moon when Dark, Sun when Light) */
 .theme-icon-dark { display: inline-block; }
 .theme-icon-light { display: none; }
-
-[data-theme="light"] .theme-icon-dark { display: none; }
-[data-theme="light"] .theme-icon-light { display: inline-block; }
 
 .user-menu summary::-webkit-details-marker {
   display: none;

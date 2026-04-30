@@ -129,8 +129,9 @@
         try {
           const saved = localStorage.getItem("eaut_theme");
           const theme = (saved === "dark" || saved === "light") ? saved : (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light");
+          const isLight = theme === "light";
+          document.documentElement.classList.toggle("light-theme", isLight);
           document.documentElement.setAttribute("data-theme", theme);
-          document.body.setAttribute("data-theme", theme);
         } catch (e) {}
       })();
     </script>
