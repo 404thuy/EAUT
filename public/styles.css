@@ -1075,6 +1075,24 @@ select, input {
     width: 100% !important;
     min-width: 0 !important;
   }
+  
+  select, input {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+}
+
+/* Fix for long text in buttons and selects */
+select {
+  text-overflow: ellipsis;
+}
+
+.btn {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Footer */

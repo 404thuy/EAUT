@@ -1,6 +1,5 @@
 const path = require("path");
-const express = require("express");
-const session = require("express-session");
+const cookieSession = require("cookie-session");
 const dotenv = require("dotenv");
 const { getStudentSchedule, getStudentTermSchedule, getStudentExamSchedule } = require("./services/eautClient");
 
@@ -13,16 +12,13 @@ app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: false }));
-app.set("trust proxy", 1); // Trust first proxy (Vercel)
+app.set("trust proxy", 1); 
+
 app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "eaut-schedule-local-secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: { 
-      maxAge: 1000 * 60 * 60 * 24, // 24 hours
-      secure: process.env.NODE_ENV === "production" // Only send over HTTPS in production
-    },
+  cookieSession({
+    name: "eaut-session",
+    keys: [process.env.SESSION_SECRET || "eaut-secret-key"],
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
   })
 );
 
