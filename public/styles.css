@@ -1095,6 +1095,23 @@ select {
   white-space: nowrap;
 }
 
+@media (max-width: 480px) {
+  .user-btn div {
+    display: none !important;
+  }
+  .header-title {
+    font-size: 0.9rem;
+  }
+  .header-actions {
+    gap: 0.4rem;
+  }
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 1.2rem;
+  }
+}
+
 /* Footer */
 .site-footer {
   padding: 2rem;
