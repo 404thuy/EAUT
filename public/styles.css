@@ -132,25 +132,46 @@ html, body {
   100% { --gradient-angle: 360deg; }
 }
 
+@keyframes waveEffect {
+  0%, 100% { opacity: 0.3; filter: blur(25px); }
+  50% { opacity: 0.6; filter: blur(45px); }
+}
+
 .app-layout-wrapper {
   display: flex;
   width: 100%;
   height: 100vh;
   position: relative;
-  padding: 1.5px;
-  background: conic-gradient(from var(--gradient-angle), #ff0055, #00f3ff, #7000ff, #00f3ff, #ff0055);
-  animation: rotation 6s linear infinite;
+  padding: 1px;
+  background: conic-gradient(from var(--gradient-angle), 
+    transparent 0%, 
+    #ff0055 10%, 
+    transparent 20%, 
+    #00f3ff 40%, 
+    transparent 50%, 
+    #7000ff 70%, 
+    transparent 80%, 
+    #00f3ff 90%, 
+    transparent 100%);
+  animation: rotation 10s linear infinite;
   z-index: 1;
 }
 
 .app-layout-wrapper::before {
   content: "";
   position: absolute;
-  inset: -8px;
-  background: conic-gradient(from var(--gradient-angle), #ff0055, #00f3ff, #7000ff, #00f3ff, #ff0055);
-  filter: blur(20px);
-  opacity: 0.4;
-  animation: rotation 6s linear infinite;
+  inset: -15px;
+  background: conic-gradient(from var(--gradient-angle), 
+    transparent 0%, 
+    #ff0055 15%, 
+    transparent 35%, 
+    #00f3ff 50%, 
+    transparent 65%, 
+    #7000ff 85%, 
+    transparent 100%);
+  filter: blur(35px);
+  opacity: 0.5;
+  animation: rotation 10s linear infinite, waveEffect 5s ease-in-out infinite;
   z-index: -1;
 }
 
