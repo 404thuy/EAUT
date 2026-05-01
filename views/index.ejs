@@ -554,28 +554,42 @@
                                   const si = shiftFromPeriodStart(item.periodStart, item.session);
                                   const tietLabel = item.time && item.time !== '-' ? `Tiết ${item.time}` : `Ca ${si.shift}`;
                                 %>
-                                <div
-                                  class="session-item session-item--compact"
-                                  style="--accent: <%= accentFromText(item.course) %>;"
-                                  data-search-content="<%= [item.course, item.teacher, item.room, item.day, item.date, item.time].join(' ').toLowerCase() %>"
-                                >
-                                  <div class="session-item__top">
-                                    <div class="session-item__title"><%= item.course %></div>
-                                    <% if (item.time && item.time !== '-') { %>
-                                      <div class="tiet-badge">
-                                        Tiết
-                                        <span><%= item.time %></span>
+                                    <div
+                                      class="session-item session-item--compact"
+                                      style="--accent: <%= accentFromText(item.course) %>; min-height: 90px; display: flex; flex-direction: column; padding: 0.6rem;"
+                                      data-search-content="<%= [item.course, item.teacher, item.room, item.day, item.date, item.time].join(' ').toLowerCase() %>"
+                                      data-target-time="<%= day.date ? (day.date.split('/').reverse().join('-') + 'T' + start.padStart(5, '0')) : '' %>"
+                                    >
+                                      <div class="session-item__top" style="flex-direction: column; align-items: flex-start; gap: 2px; margin-bottom: 6px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; gap: 6px;">
+                                          <div class="session-item__title" style="flex: 1; font-weight: 800; font-size: 0.85rem; line-height: 1.2; color: var(--text-main);"><%= item.course %></div>
+                                          <% if (item.time && item.time !== '-') { %>
+                                            <div class="tiet-badge" style="flex-shrink: 0; background: var(--accent); color: white; padding: 4px 6px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 40px;">
+                                              <span style="font-size: 0.55rem; font-weight: 800; text-transform: uppercase; line-height: 1; opacity: 0.9; margin-bottom: 2px;">Tiết</span>
+                                              <span style="font-size: 0.8rem; font-weight: 900; line-height: 1;"><%= item.time %></span>
+                                            </div>
+                                          <% } %>
+                                        </div>
+                                        <div class="countdown-tag" style="font-size: 0.65rem; font-weight: 700;" data-countdown-target></div>
                                       </div>
-                                    <% } %>
-                                  </div>
-                                  <div class="session-item__sub">
-                                    <span class="si-room">📍 <%= item.room %></span>
-                                    <span class="si-teacher">👤 <%= item.teacher %></span>
-                                    <% if (item.mode) { %>
-                                      <span class="si-mode">📝 <%= item.mode %></span>
-                                    <% } %>
-                                  </div>
-                                </div>
+                                      
+                                      <div class="session-item__sub" style="display: flex; flex-direction: column; gap: 2px; margin-top: auto; border-top: 1px dashed var(--line); padding-top: 4px;">
+                                        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
+                                          <span style="flex: 0 0 14px; opacity: 0.7;">📍</span>
+                                          <span style="flex: 1; color: var(--text-muted);"><%= item.room %></span>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
+                                          <span style="flex: 0 0 14px; opacity: 0.7;">👤</span>
+                                          <span style="flex: 1; color: var(--text-muted);"><%= item.teacher %></span>
+                                        </div>
+                                        <% if (item.mode) { %>
+                                          <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
+                                            <span style="flex: 0 0 14px; opacity: 0.7;">📝</span>
+                                            <span style="flex: 1; color: var(--primary); font-weight: 700;"><%= item.mode %></span>
+                                          </div>
+                                        <% } %>
+                                      </div>
+                                    </div>
                               <% }) %>
                             </div>
                           <% } else { %>
@@ -611,33 +625,46 @@
                       </div>
                     </header>
                     <div class="list-items">
-                      <% day.items.forEach((item) => { %>
+                      <% day.items.forEach((item, index) => { %>
                         <% const shiftInfo = shiftFromPeriodStart(item.periodStart, item.session); %>
                         <div
                           class="list-item"
-                          style="--accent: <%= accentFromText(item.course) %>;"
+                          style="--accent: <%= accentFromText(item.course) %>; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: <%= index * 0.05 %>s;"
                           data-search-content="<%= [item.course, item.teacher, item.room, item.day, item.date, item.time].join(' ').toLowerCase() %>"
                           data-day-index="<%= item.dayIndex || '' %>"
+                          data-target-time="<%= day.date ? (day.date.split('/').reverse().join('-') + 'T' + shiftInfo.range.split(' - ')[0].padStart(5, '0')) : '' %>"
                         >
                           <div class="list-item__left">
                             <div class="shift-name">Ca <%= shiftInfo.shift %></div>
                             <div class="shift-time"><%= shiftInfo.range %></div>
                           </div>
                           <div class="list-item__right">
-                            <div class="list-item__top">
-                              <h4><%= item.course %></h4>
-                              <% if (item.time && item.time !== '-') { %>
-                                <div class="tiet-badge">
-                                  Tiết
-                                  <span><%= item.time %></span>
+                            <div class="list-item__top" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px;">
+                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                  <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--text-main);"><%= item.course %></h4>
+                                  <div class="countdown-tag" style="font-size: 0.65rem; font-weight: 700;" data-countdown-target></div>
                                 </div>
-                              <% } %>
+                                <% if (item.time && item.time !== '-') { %>
+                                  <div class="tiet-badge" style="flex-shrink: 0; background: var(--accent); color: white; padding: 4px 6px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 40px;">
+                                    <span style="font-size: 0.55rem; font-weight: 800; text-transform: uppercase; line-height: 1; opacity: 0.9; margin-bottom: 2px;">Tiết</span>
+                                    <span style="font-size: 0.8rem; font-weight: 900; line-height: 1;"><%= item.time %></span>
+                                  </div>
+                                <% } %>
                             </div>
-                            <div class="meta">
-                              <div>📍 Phòng: <strong><%= item.room %></strong></div>
-                              <div>👤 Giảng viên: <strong><%= item.teacher %></strong></div>
+                            <div class="meta" style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 15px; align-items: center; margin-top: 4px;">
+                              <div style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--text-muted);">
+                                <span style="opacity: 0.7;">📍</span>
+                                <span>Phòng: <strong style="color: var(--text-main);"><%= item.room %></strong></span>
+                              </div>
+                              <div style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--text-muted);">
+                                <span style="opacity: 0.7;">👤</span>
+                                <span>Giảng viên: <strong style="color: var(--text-main);"><%= item.teacher %></strong></span>
+                              </div>
                               <% if (item.mode) { %>
-                                <div>📝 Hình thức: <strong><%= item.mode %></strong></div>
+                                <div style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--text-muted);">
+                                  <span style="opacity: 0.7;">📝</span>
+                                  <span>Hình thức: <strong style="color: var(--primary);"><%= item.mode %></strong></span>
+                                </div>
                               <% } %>
                             </div>
                           </div>
@@ -810,21 +837,41 @@
                   <% for (const item of grouped.values()) { %>
                     <div class="term-card" style="--accent: <%= accentFromText(item.name) %>;">
                       <div class="term-card__header">
-                        <div class="course-badge"><%= item.id.substring(0, 2) %></div>
+                        <div class="course-badge" style="background: var(--accent); color: white;"><%= item.id.substring(0, 2) %></div>
                         <div class="course-code"><%= item.id %> · <%= item.credits %> tín</div>
                       </div>
+                      
                       <h3><%= item.name %></h3>
-                      <div class="term-meta" style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.8rem;">
-                        <span>🏷️ Lớp: <strong><%= item.className %></strong></span>
-                        <span>👤 GV: <strong><%= item.teacher %></strong></span>
-                        <span>📍 Phòng: <strong><%= item.room %></strong></span>
+                      
+                      <div class="term-meta" style="display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.6rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem;">
+                          <span style="flex: 0 0 16px; text-align: center; opacity: 0.8;">🏷️</span>
+                          <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            Lớp: <strong style="color: var(--text-main);"><%= item.className %></strong>
+                          </div>
+                        </div>
+                        <div style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.75rem;">
+                          <span style="flex: 0 0 16px; text-align: center; opacity: 0.8; margin-top: 1px;">👤</span>
+                          <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4;">
+                            GV: <strong style="color: var(--text-main);"><%= item.teacher %></strong>
+                          </div>
+                        </div>
+                        <div style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.75rem;">
+                          <span style="flex: 0 0 16px; text-align: center; opacity: 0.8; margin-top: 1px;">📍</span>
+                          <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4;">
+                            Phòng: <strong style="color: var(--text-main);"><%= item.schedules.some(s => s.includes('E-learning')) && item.room === 'Đang cập nhật' ? 'E-learning' : item.room %></strong>
+                          </div>
+                        </div>
                       </div>
-                      <div class="term-schedule" style="margin-top: 1rem; padding-top: 0.8rem; border-top: 1px dashed var(--line);">
-                        <label style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px;">Thời gian học</label>
-                        <div class="schedule-text" style="white-space: pre-line; margin-top: 0.3rem;">
-                          <% item.schedules.forEach(s => { %>
-                            <div>• <%= s %></div>
-                          <% }) %>
+
+                      <div class="term-schedule" style="margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--line);">
+                        <div style="display: flex; align-items: flex-start; gap: 0.4rem; color: var(--primary);">
+                          <span style="font-size: 0.75rem;">📅</span>
+                          <div style="font-size: 0.7rem; line-height: 1.4; font-weight: 700;">
+                            <% item.schedules.forEach(s => { %>
+                              <div>• <%= s.replace('Từ ', '').replace('đến ', '→ ') %></div>
+                            <% }) %>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -881,12 +928,12 @@
             <div class="term-layout">
               <% sortedSemNames.forEach(semName => { %>
                 <div class="list-day-header" style="margin-top: 2.5rem; border-bottom: 2px solid var(--primary); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: flex-end;">
-                  <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--text);"><%= semName %></h3>
-                  <span class="muted" style="font-size: 0.9rem;">Tổng cộng: <strong><%= examSemesters[semName].length %></strong> môn</span>
+                  <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--text);"><%= semName %></h3>
+                  <span class="muted" style="font-size: 0.8rem;">Tổng: <strong><%= examSemesters[semName].length %></strong> môn</span>
                 </div>
 
-                <div class="term-grid" style="margin-top: 1.5rem;">
-                  <% examSemesters[semName].forEach(row => {
+                <div class="term-grid" style="margin-top: 1rem;">
+                  <% examSemesters[semName].forEach((row, index) => {
                        const subject = row[1] || "-";
                        const attempt = row[2] || "-";
                        const phase = row[3] || "-";
@@ -899,51 +946,41 @@
                   %>
                     <div
                       class="term-card exam-item"
-                      style="--accent: <%= accentFromText(subject) %>; display: flex; flex-direction: column;"
+                      style="--accent: <%= accentFromText(subject) %>; display: flex; flex-direction: column; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: <%= index * 0.05 %>s;"
                       data-search-content="<%= [subject, room, sbd, date, format].join(' ').toLowerCase() %>"
+                      data-target-time="<%= date ? (date.split('/').reverse().join('-') + 'T' + time.replace('h', ':').padStart(5, '0')) : '' %>"
                     >
-                      <div class="term-card-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.8rem;">
-                        <span class="term-id" style="background: var(--accent); color: white; padding: 0.25rem 0.6rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem;">
+                      <div class="term-card-header" style="margin-bottom: 0.6rem;">
+                        <span class="course-badge" style="background: var(--accent); color: white; padding: 0.15rem 0.5rem; font-size: 0.6rem; border-radius: 4px; font-weight: 800; line-height: 1.2;">
                           <%= format %>
                         </span>
                       </div>
                       
-                      <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text); line-height: 1.4;"><%= subject %></h3>
+                      <h3 style="font-size: 0.85rem; font-weight: 800; color: var(--text-main); line-height: 1.2;"><%= subject %></h3>
                       
-                      <div class="exam-meta-grid" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 0.75rem 1rem; margin-top: 1rem;">
-                        <div class="meta-item" style="display: flex; align-items: center; gap: 0.6rem;">
-                          <span style="font-size: 1rem; width: 20px; text-align: center;">📍</span>
-                          <span style="font-size: 0.85rem; color: var(--text-muted);">Phòng: <strong style="color: var(--text-main);"><%= room %></strong></span>
+                      <div class="exam-meta-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem; border-top: 1px solid var(--line); padding-top: 0.4rem;">
+                        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
+                          <span style="opacity: 0.7;">📍</span>
+                          <span style="color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Phòng: <strong><%= room %></strong></span>
                         </div>
-                        <div class="meta-item" style="display: flex; align-items: center; gap: 0.6rem;">
-                          <span style="font-size: 1rem; width: 20px; text-align: center;">🏷️</span>
-                          <span style="font-size: 0.85rem; color: var(--text-muted);">SBD: <strong style="color: var(--primary);"><%= sbd %></strong></span>
+                        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
+                          <span style="opacity: 0.7;">🏷️</span>
+                          <span style="color: var(--text-muted);">SBD: <strong style="color: var(--accent);"><%= sbd %></strong></span>
                         </div>
-                        <div class="meta-item" style="display: flex; align-items: center; gap: 0.6rem;">
-                          <span style="font-size: 1rem; width: 20px; text-align: center;">📅</span>
-                          <span style="font-size: 0.85rem; color: var(--text-muted);">Ngày: <strong style="color: var(--text-main);"><%= date %></strong></span>
+                        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
+                          <span style="opacity: 0.7;">📅</span>
+                          <span style="color: var(--text-muted);">Ngày: <strong><%= date %></strong></span>
                         </div>
-                        <div class="meta-item" style="display: flex; align-items: center; gap: 0.6rem;">
-                          <span style="font-size: 1rem; width: 20px; text-align: center;">🕒</span>
-                          <span style="font-size: 0.85rem; color: var(--text-muted);">Giờ: <strong style="color: var(--text-main);"><%= time %></strong></span>
-                        </div>
-                        <div class="meta-item" style="display: flex; align-items: center; gap: 0.6rem;">
-                          <span style="font-size: 1rem; width: 20px; text-align: center;">☀️</span>
-                          <span style="font-size: 0.85rem; color: var(--text-muted);">Buổi: <strong style="color: var(--text-main);"><%= shift %></strong></span>
-                        </div>
-                        <div class="meta-item" style="display: flex; align-items: flex-start; gap: 0.6rem; grid-column: 1 / -1; margin-top: 0.2rem; padding-top: 0.5rem; border-top: 1px solid var(--line);">
-                          <span style="font-size: 1rem; width: 20px; text-align: center;">📝</span>
-                          <span style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">Hình thức: <strong style="color: var(--text-main);"><%= format %></strong></span>
+                        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
+                          <span style="opacity: 0.7;">🕒</span>
+                          <span style="color: var(--text-muted);">Giờ: <strong><%= time %> (<%= shift %>)</strong></span>
                         </div>
                       </div>
                       
-                      <div class="term-schedule" style="margin-top: auto; padding-top: 0.8rem; border-top: 1px dashed var(--line); margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                        <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600;">
-                          Lần thi: <strong style="color: var(--text);"><%= attempt %></strong>
-                        </div>
-                        <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600;">
-                          Đợt thi: <strong style="color: var(--text);"><%= phase %></strong>
-                        </div>
+                      <div class="term-schedule" style="margin-top: auto; padding: 0.5rem; border-top: 1px dashed var(--line); margin-top: 0.6rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; align-items: center; font-size: 0.6rem; font-weight: 700; color: var(--text-dim); text-align: center;">
+                        <span style="border-right: 1px solid var(--line); padding-right: 4px;">Lần <%= attempt %></span>
+                        <span style="border-right: 1px solid var(--line); padding-right: 4px;">Đợt <%= phase %></span>
+                        <div class="countdown-tag" style="font-size: 0.58rem; color: var(--accent);" data-countdown-target></div>
                       </div>
                     </div>
                   <% }) %>
@@ -977,8 +1014,8 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <% (weekly.rows || []).forEach(row => { %>
-                      <tr>
+                    <% (weekly.rows || []).forEach((row, index) => { %>
+                      <tr class="list-item" style="animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: <%= index * 0.05 %>s;">
                         <td><%= row[6] %></td>
                         <td><%= row[0] %> <%= row[1] %></td>
                         <td><%= row[2] %></td>
@@ -1001,8 +1038,8 @@
                     <h3><%= sem.semester %></h3>
                   </div>
                   <div class="term-grid">
-                    <% sem.rows.forEach(row => { %>
-                      <div class="term-card" style="--accent: <%= accentFromText(row[1]) %>;">
+                    <% sem.rows.forEach((row, index) => { %>
+                      <div class="term-card" style="--accent: <%= accentFromText(row[1]) %>; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: <%= index * 0.05 %>s;">
                         <strong><%= row[1] %></strong> - <%= row[2] %> tín
                       </div>
                     <% }) %>
@@ -1022,9 +1059,7 @@
             </section>
           </main>
 
-          <footer class="site-footer">
-            <p>EAUT Schedule · UI pastel dễ nhìn · Không thay đổi logic backend.</p>
-          </footer>
+
         </div>
       </div>
     </div>
@@ -1089,19 +1124,59 @@
         });
       }
 
-      // Show loading on all form submits and major link clicks
+      // Show loading only on form submits and manual refresh
       const showLoading = () => document.getElementById('loadingOverlay').classList.remove('is-hidden');
-      
       document.querySelectorAll('form').forEach(f => f.addEventListener('submit', showLoading));
-      document.querySelectorAll('.nav-item:not([target="_blank"]), .btn-primary:not([href^="#"]), #refreshBtn').forEach(el => {
-        el.addEventListener('click', (e) => {
-           if (e.currentTarget.tagName === 'A' && e.currentTarget.getAttribute('href').startsWith('/')) {
-             showLoading();
-           } else if (e.currentTarget.id === 'refreshBtn') {
-             showLoading();
-           }
-        });
-      });
+      
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', showLoading);
+      }
     </script>
-  </body>
+  
+  <script>
+    // Countdown Timer Logic
+    function updateCountdowns() {
+      const now = new Date();
+      document.querySelectorAll('[data-target-time]').forEach(el => {
+        const targetStr = el.getAttribute('data-target-time');
+        const display = el.querySelector('[data-countdown-target]');
+        if (!targetStr || !display) return;
+
+        const target = new Date(targetStr);
+        const diff = target - now;
+
+        if (diff <= 0) {
+          const endTarget = new Date(target);
+          endTarget.setHours(endTarget.getHours() + 2.5); // Assume 2.5 hours duration
+          if (now < endTarget) {
+            display.innerText = '● Đang diễn ra';
+            display.style.color = '#ff9f43';
+          } else {
+            display.innerText = '✓ Đã kết thúc';
+            display.style.color = 'var(--text-dim)';
+            display.style.opacity = '0.6';
+          }
+          return;
+        }
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+        let text = '⏳ Còn ';
+        if (days > 0) text += `${days}n `;
+        if (hours > 0 || days > 0) text += `${hours}g `;
+        text += `${mins}p`;
+
+        display.innerText = text;
+        display.style.color = display.closest('.term-card, .session-item').style.getPropertyValue('--accent') || 'var(--primary)';
+      });
+    }
+
+    // Run every minute
+    setInterval(updateCountdowns, 60000);
+    // Initial run
+    updateCountdowns();
+  </script>
+</body>
 </html>
