@@ -11,16 +11,7 @@
   ],
   "routes": [
     {
-      "src": "/favicon.ico",
-      "dest": "/public/favicon.png"
-    },
-    {
-      "src": "/styles.css",
-      "dest": "/public/styles.css"
-    },
-    {
-      "src": "/app.js",
-      "dest": "/public/app.js"
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
