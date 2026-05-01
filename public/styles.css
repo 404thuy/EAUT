@@ -133,8 +133,8 @@ html, body {
 }
 
 @keyframes waveEffect {
-  0%, 100% { opacity: 0.3; filter: blur(25px); }
-  50% { opacity: 0.6; filter: blur(45px); }
+  0%, 100% { opacity: 0.5; filter: blur(30px); }
+  50% { opacity: 0.9; filter: blur(60px); }
 }
 
 .app-layout-wrapper {
@@ -142,16 +142,16 @@ html, body {
   width: 100%;
   height: 100vh;
   position: relative;
-  padding: 1px;
+  padding: 1.2px;
   background: conic-gradient(from var(--gradient-angle), 
     transparent 0%, 
-    #ff0055 10%, 
-    transparent 20%, 
-    #00f3ff 40%, 
-    transparent 50%, 
-    #7000ff 70%, 
-    transparent 80%, 
-    #00f3ff 90%, 
+    #ff0055 8%, #ffffff 10%, #ff0055 12%,
+    transparent 25%, 
+    #00f3ff 38%, #ffffff 40%, #00f3ff 42%,
+    transparent 55%, 
+    #7000ff 68%, #ffffff 70%, #7000ff 72%,
+    transparent 85%, 
+    #00f3ff 93%, #ffffff 95%, #00f3ff 97%,
     transparent 100%);
   animation: rotation 10s linear infinite;
   z-index: 1;
@@ -160,17 +160,17 @@ html, body {
 .app-layout-wrapper::before {
   content: "";
   position: absolute;
-  inset: -15px;
+  inset: -20px;
   background: conic-gradient(from var(--gradient-angle), 
     transparent 0%, 
-    #ff0055 15%, 
+    #ff0055 10%, #ffffff 15%, #ff0055 20%,
     transparent 35%, 
-    #00f3ff 50%, 
-    transparent 65%, 
-    #7000ff 85%, 
+    #00f3ff 45%, #ffffff 50%, #00f3ff 55%,
+    transparent 70%, 
+    #7000ff 80%, #ffffff 85%, #7000ff 90%,
     transparent 100%);
-  filter: blur(35px);
-  opacity: 0.5;
+  filter: blur(40px);
+  opacity: 0.7;
   animation: rotation 10s linear infinite, waveEffect 5s ease-in-out infinite;
   z-index: -1;
 }
