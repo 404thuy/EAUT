@@ -137,22 +137,18 @@ html, body {
   width: 100%;
   height: 100vh;
   position: relative;
-  padding: 3px;
-  border-radius: 0;
-  background: conic-gradient(from var(--gradient-angle), #ff0055, #00f3ff, #ff00ff, #ffe600, #00ff66, #ff0055);
-  animation: rotation 4s linear infinite;
   z-index: 1;
 }
 
 .app-layout-wrapper::before {
   content: "";
   position: absolute;
-  inset: -2px;
-  border-radius: 0;
+  inset: 0px;
+  border-radius: var(--radius-xl);
   background: conic-gradient(from var(--gradient-angle), #ff0055, #00f3ff, #ff00ff, #ffe600, #00ff66, #ff0055);
-  filter: blur(20px);
-  opacity: 0.85;
-  animation: rotation 4s linear infinite;
+  filter: blur(25px);
+  opacity: 0.65;
+  animation: rotation 6s linear infinite;
   z-index: -1;
 }
 
@@ -161,7 +157,7 @@ html, body {
   width: 100%;
   height: 100%;
   background: var(--bg-main);
-  border-radius: 0;
+  border-radius: var(--radius-xl);
   overflow: hidden;
   position: relative;
 }
