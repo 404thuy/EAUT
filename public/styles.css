@@ -137,10 +137,23 @@ html, body {
   width: 100%;
   height: 100vh;
   position: relative;
-  padding: 2.5px;
-  background: conic-gradient(from var(--gradient-angle), transparent 0%, var(--primary) 15%, #ffffff 20%, var(--primary) 25%, transparent 40%, transparent 60%, var(--accent-pink) 75%, #ffffff 80%, var(--accent-pink) 85%, transparent 100%);
-  animation: rotation 4s linear infinite;
-  box-shadow: 0 0 30px rgba(124, 139, 255, 0.6), inset 0 0 10px rgba(0,0,0,0.5);
+  padding: 1.5px;
+  border-radius: var(--radius-xl);
+  background: conic-gradient(from var(--gradient-angle), var(--line) 0%, var(--line) 30%, var(--primary) 48%, var(--accent-blue) 50%, var(--primary) 52%, var(--line) 70%, var(--line) 100%);
+  animation: rotation 5s linear infinite;
+  z-index: 1;
+}
+
+.app-layout-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: calc(var(--radius-xl) + 1px);
+  background: conic-gradient(from var(--gradient-angle), transparent 0%, transparent 30%, var(--primary) 45%, var(--accent-blue) 50%, var(--primary) 55%, transparent 70%, transparent 100%);
+  filter: blur(15px);
+  opacity: 0.7;
+  animation: rotation 5s linear infinite;
+  z-index: -1;
 }
 
 .app-layout {
@@ -148,7 +161,7 @@ html, body {
   width: 100%;
   height: 100%;
   background: var(--bg-main);
-  border-radius: calc(var(--radius-xl) - 2.5px);
+  border-radius: calc(var(--radius-xl) - 1.5px);
   overflow: hidden;
   position: relative;
 }
