@@ -555,9 +555,10 @@
                                   const si = shiftFromPeriodStart(item.periodStart, item.session);
                                   const tietLabel = item.time && item.time !== '-' ? `Tiết ${item.time}` : `Ca ${si.shift}`;
                                 %>
+                                  <% const compactStyle = `style="--accent: ${accentFromText(item.course)}; min-height: 90px; display: flex; flex-direction: column; padding: 0.6rem;"`; %>
                                     <div
                                       class="session-item session-item--compact"
-                                      style="--accent: <%= accentFromText(item.course) %>; min-height: 90px; display: flex; flex-direction: column; padding: 0.6rem;"
+                                      <%- compactStyle %>
                                       data-search-content="<%= [item.course, item.teacher, item.room, item.day, item.date, item.time].join(' ').toLowerCase() %>"
                                       data-target-time="<%= day.date ? (day.date.split('/').reverse().join('-') + 'T' + start.padStart(5, '0')) : '' %>"
                                     >
@@ -628,9 +629,10 @@
                     <div class="list-items">
                       <% day.items.forEach((item, index) => { %>
                         <% const shiftInfo = shiftFromPeriodStart(item.periodStart, item.session); %>
+                        <% const listItemStyle = `style="--accent: ${accentFromText(item.course)}; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: ${index * 0.05}s;"`; %>
                         <div
                           class="list-item"
-                          style="--accent: <%= accentFromText(item.course) %>; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: <%= index * 0.05 %>s;"
+                          <%- listItemStyle %>
                           data-search-content="<%= [item.course, item.teacher, item.room, item.day, item.date, item.time].join(' ').toLowerCase() %>"
                           data-day-index="<%= item.dayIndex || '' %>"
                           data-target-time="<%= day.date ? (day.date.split('/').reverse().join('-') + 'T' + shiftInfo.range.split(' - ')[0].padStart(5, '0')) : '' %>"
@@ -836,7 +838,8 @@
                 </div>
                 <div class="term-grid">
                   <% for (const item of grouped.values()) { %>
-                    <div class="term-card" style="--accent: <%= accentFromText(item.name) %>;">
+                    <% const termCardStyle = `style="--accent: ${accentFromText(item.name)};"`; %>
+                    <div class="term-card" <%- termCardStyle %>>
                       <div class="term-card__header">
                         <div class="course-badge" style="background: var(--accent); color: white;"><%= item.id.substring(0, 2) %></div>
                         <div class="course-code"><%= item.id %> · <%= item.credits %> tín</div>
@@ -954,9 +957,10 @@
                        const sbd = row[8] || "-";
                        const format = row[9] || "-";
                   %>
+                    <% const examStyle = `style="--accent: ${accentFromText(subject)}; display: flex; flex-direction: column; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: ${index * 0.05}s;"`; %>
                     <div
                       class="term-card exam-item"
-                      style="--accent: <%= accentFromText(subject) %>; display: flex; flex-direction: column; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: <%= index * 0.05 %>s;"
+                      <%- examStyle %>
                       data-search-content="<%= [subject, room, sbd, date, format].join(' ').toLowerCase() %>"
                       data-target-time="<%= date ? (date.split('/').reverse().join('-') + 'T' + time.replace('h', ':').padStart(5, '0')) : '' %>"
                     >
@@ -1025,7 +1029,8 @@
                   </thead>
                   <tbody>
                     <% (weekly.rows || []).forEach((row, index) => { %>
-                      <tr class="list-item" style="animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: <%= index * 0.05 %>s;">
+                      <% const trStyle = `style="animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: ${index * 0.05}s;"`; %>
+                      <tr class="list-item" <%- trStyle %>>
                         <td><%= row[6] %></td>
                         <td><%= row[0] %> <%= row[1] %></td>
                         <td><%= row[2] %></td>
@@ -1049,7 +1054,8 @@
                   </div>
                   <div class="term-grid">
                     <% sem.rows.forEach((row, index) => { %>
-                      <div class="term-card" style="--accent: <%= accentFromText(row[1]) %>; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: <%= index * 0.05 %>s;">
+                      <% const semCardStyle = `style="--accent: ${accentFromText(row[1])}; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: ${index * 0.05}s;"`; %>
+                      <div class="term-card" <%- semCardStyle %>>
                         <strong><%= row[1] %></strong> - <%= row[2] %> tín
                       </div>
                     <% }) %>
@@ -1061,7 +1067,7 @@
         <% } %>
 
         <% if (!result) { %>
-          <section class="panel schedule-panel empty-state" id="lich-hoc" data-section="lich-hoc" style="max-width: 100%;">
+          <section class="panel schedule-panel empty-state" id="lich-hoc-empty" data-section="lich-hoc" style="max-width: 100%;">
             <h2>Chưa có dữ liệu lịch học</h2>
             <p>Đăng nhập ở khung bên trên để tải lịch học theo tuần và hiển thị theo giao diện mới.</p>
           </section>
