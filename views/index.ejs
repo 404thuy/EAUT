@@ -463,16 +463,26 @@
           </div>
 
           <div class="schedule-toolbar weekly-toolbar">
-            <div class="toolbar-group">
-              <form action="/schedule/week" method="get" class="week-form">
-                <label for="selectedWeek">Tuần học</label>
-                <select id="selectedWeek" name="week" onchange="this.form.submit()">
-                  <% (result.weekOptions || []).forEach((week) => { %>
-                  <option value="<%= week.value %>" <%= week.value === result.selectedWeekValue ? "selected" : "" %>>
-                    <%= week.label %>
-                  </option>
-                  <% }) %>
-                </select>
+            <div class="toolbar-group" style="flex: 2; min-width: 300px;">
+              <form action="/schedule/week" method="get" class="week-form" style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;">
+                
+                <div style="flex: 1; min-width: 140px; display: none;" id="virtualSemesterWrapper">
+                  <label for="virtualSemester">Học kỳ (Bộ lọc)</label>
+                  <select id="virtualSemester" style="width: 100%;">
+                    <!-- Populated by JS -->
+                  </select>
+                </div>
+
+                <div style="flex: 1.5; min-width: 180px;">
+                  <label for="selectedWeek">Tuần học</label>
+                  <select id="selectedWeek" name="week" onchange="this.form.submit()" style="width: 100%;">
+                    <% (result.weekOptions || []).forEach((week) => { %>
+                    <option value="<%= week.value %>" <%= week.value === result.selectedWeekValue ? "selected" : "" %> data-label="<%= week.label %>">
+                      <%= week.label %>
+                    </option>
+                    <% }) %>
+                  </select>
+                </div>
               </form>
             </div>
 
@@ -1177,6 +1187,94 @@
     setInterval(updateCountdowns, 60000);
     // Initial run
     updateCountdowns();
+    // Virtual Semester Logic for Weekly View
+    document.addEventListener('DOMContentLoaded', () => {
+      const weekSelect = document.getElementById('selectedWeek');
+      const semWrapper = document.getElementById('virtualSemesterWrapper');
+      const semSelect = document.getElementById('virtualSemester');
+      
+      if (!weekSelect || !semSelect) return;
+
+      const options = Array.from(weekSelect.options);
+      const semesters = new Map();
+      
+      const getSemester = (dateStr) => {
+        if (!dateStr) return null;
+        const parts = dateStr.split('/');
+        if (parts.length !== 3) return null;
+        const month = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        
+        let term, schoolYear;
+        if (month >= 8 && month <= 12) {
+          term = 1; schoolYear = `${year}-${year+1}`;
+        } else if (month >= 1 && month <= 5) {
+          term = 2; schoolYear = `${year-1}-${year}`;
+        } else {
+          term = 3; schoolYear = `${year-1}-${year}`; // Summer
+        }
+        return `Học kỳ ${term} (${schoolYear})`;
+      };
+
+      options.forEach(opt => {
+        const label = opt.getAttribute('data-label') || opt.text;
+        const match = label.match(/Từ ngày\s+(\d{2}\/\d{2}\/\d{4})/i);
+        if (match) {
+          const sem = getSemester(match[1]);
+          if (sem) {
+            opt.setAttribute('data-sem', sem);
+            if (!semesters.has(sem)) semesters.set(sem, []);
+            semesters.get(sem).push(opt);
+          }
+        }
+      });
+
+      if (semesters.size > 0) {
+        semWrapper.style.display = 'block';
+        
+        let activeSem = null;
+        semesters.forEach((opts, semName) => {
+          const option = document.createElement('option');
+          option.value = semName;
+          option.textContent = semName;
+          semSelect.appendChild(option);
+          
+          if (opts.some(o => o.selected)) {
+            activeSem = semName;
+          }
+        });
+
+        if (activeSem) {
+          semSelect.value = activeSem;
+        } else {
+          semSelect.value = Array.from(semesters.keys()).pop();
+        }
+
+        const filterWeeks = () => {
+          const selSem = semSelect.value;
+          options.forEach(opt => {
+            if (opt.getAttribute('data-sem') === selSem) {
+              opt.style.display = '';
+              opt.disabled = false;
+            } else {
+              opt.style.display = 'none';
+              opt.disabled = true;
+            }
+          });
+        };
+
+        semSelect.addEventListener('change', () => {
+          filterWeeks();
+          const firstVisible = options.find(o => !o.disabled);
+          if (firstVisible && !firstVisible.selected) {
+             firstVisible.selected = true;
+             weekSelect.form.submit();
+          }
+        });
+
+        filterWeeks();
+      }
+    });
   </script>
 </body>
 </html>
