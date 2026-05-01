@@ -772,68 +772,8 @@ async function getStudentSchedule(username, password, options = {}) {
   let resolvedFromAnotherWeek = false;
   let originalWeekLabel = weekMeta.selected?.label || null;
 
-  // FETCH REAL SEMESTERS from TERM SCHEDULE
-  let termSemesters = [];
-  let minDate = Infinity;
-  let maxDate = -Infinity;
-  let actualSelectedSemester = null;
-
-  try {
-    const termResult = await getStudentTermSchedule(username, password, { preferredSemester: options.preferredSemester, useCache: options.useCache });
-    termSemesters = termResult.semesterOptions || [];
-    actualSelectedSemester = termResult.semesterOptions.find(o => o.selected)?.value || options.preferredSemester;
-    
-    if (termResult.results && termResult.results.length > 0) {
-      termResult.results[0].rows.forEach(row => {
-         row.forEach(cell => {
-           const dates = (cell || "").match(/\d{2}\/\d{2}\/\d{2,4}/g);
-           if (dates) {
-             dates.forEach(d => {
-               let [D, M, Y] = d.split("/");
-               if (Y.length === 2) Y = "20" + Y;
-               const time = new Date(`${Y}-${M}-${D}`).getTime();
-               if (!isNaN(time)) {
-                 if (time < minDate) minDate = time;
-                 if (time > maxDate) maxDate = time;
-               }
-             });
-           }
-         });
-      });
-    }
-  } catch (e) {
-    console.error("Error fetching term schedule for weekly filter", e);
-  }
-
-  // Filter weekMeta.options
-  let filteredOptions = weekMeta.options;
-  if (minDate !== Infinity && maxDate !== -Infinity) {
-    const padding = 7 * 24 * 60 * 60 * 1000;
-    minDate -= padding;
-    maxDate += padding;
-    
-    filteredOptions = weekMeta.options.filter(week => {
-       const match = week.label.match(/Từ ngày\s+(\d{2}\/\d{2}\/\d{4})\s+đến ngày\s+(\d{2}\/\d{2}\/\d{4})/i);
-       if (!match) return true;
-       let [D1, M1, Y1] = match[1].split("/");
-       let [D2, M2, Y2] = match[2].split("/");
-       const tStart = new Date(`${Y1}-${M1}-${D1}`).getTime();
-       const tEnd = new Date(`${Y2}-${M2}-${D2}`).getTime();
-       return tEnd >= minDate && tStart <= maxDate;
-    });
-  }
-
-  if (filteredOptions.length > 0) {
-     weekMeta.options = filteredOptions;
-  }
-  
-  let targetWeek = preferredWeek;
-  if (targetWeek && !weekMeta.options.some(o => o.value === targetWeek)) {
-     targetWeek = weekMeta.options[0]?.value;
-  }
-
   // 2. Handle Week Selection
-  if (targetWeek && targetWeek !== weekMeta.selected?.value && weekMeta.options.some((item) => item.value === targetWeek)) {
+  if (preferredWeek && weekMeta.options.some((item) => item.value === preferredWeek)) {
     const hidden = extractHiddenFields($schedule);
     const weekPayload = {
       ...hidden,
@@ -896,13 +836,13 @@ async function getStudentSchedule(username, password, options = {}) {
       value: item.value,
       selected: item.selected,
     })),
-    semesterOptions: termSemesters.map((item) => ({
+    semesterOptions: semesters.map((item) => ({
       label: item.label,
       value: item.value,
-      selected: item.value === actualSelectedSemester,
+      selected: item.selected,
     })),
-    selectedSemesterValue: actualSelectedSemester,
-    autoSwitchedWeek: resolvedFromAnotherWeek || (preferredWeek && preferredWeek !== targetWeek),
+    selectedSemesterValue: selectedSemesterObj?.value || null,
+    autoSwitchedWeek: resolvedFromAnotherWeek,
     originalWeekLabel,
     studentName,
     ...schedule,
@@ -913,8 +853,7 @@ async function getStudentSchedule(username, password, options = {}) {
 
 async function getStudentTermSchedule(username, password, options = {}) {
   const fetchAll = Boolean(options.fetchAll);
-  const preferredSemester = options.preferredSemester || null;
-  const key = cacheKey(username, "term", { fetchAll, preferredSemester });
+  const key = cacheKey(username, "term", { fetchAll });
   if (options.useCache !== false) {
     const cached = getFromCache(key);
     if (cached) return cached;

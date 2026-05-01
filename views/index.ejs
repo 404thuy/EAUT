@@ -463,32 +463,16 @@
           </div>
 
           <div class="schedule-toolbar weekly-toolbar">
-            <div class="toolbar-group" style="flex: 2; min-width: 300px;">
-              <form action="/schedule/week" method="get" class="week-form" style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;">
-                
-                <% if (result.semesterOptions && result.semesterOptions.length > 0) { %>
-                <div style="flex: 1; min-width: 140px;">
-                  <label for="selectedSemester">Học kỳ</label>
-                  <select id="selectedSemester" name="semester" onchange="this.form.querySelector('#selectedWeek').value=''; this.form.submit()" style="width: 100%;">
-                    <% result.semesterOptions.forEach((sem) => { %>
-                    <option value="<%= sem.value %>" <%= sem.value === result.selectedSemesterValue ? "selected" : "" %>>
-                      <%= sem.label %>
-                    </option>
-                    <% }) %>
-                  </select>
-                </div>
-                <% } %>
-
-                <div style="flex: 1.5; min-width: 180px;">
-                  <label for="selectedWeek">Tuần học</label>
-                  <select id="selectedWeek" name="week" onchange="this.form.submit()" style="width: 100%;">
-                    <% (result.weekOptions || []).forEach((week) => { %>
-                    <option value="<%= week.value %>" <%= week.value === result.selectedWeekValue ? "selected" : "" %> data-label="<%= week.label %>">
-                      <%= week.label %>
-                    </option>
-                    <% }) %>
-                  </select>
-                </div>
+            <div class="toolbar-group">
+              <form action="/schedule/week" method="get" class="week-form">
+                <label for="selectedWeek">Tuần học</label>
+                <select id="selectedWeek" name="week" onchange="this.form.submit()">
+                  <% (result.weekOptions || []).forEach((week) => { %>
+                  <option value="<%= week.value %>" <%= week.value === result.selectedWeekValue ? "selected" : "" %>>
+                    <%= week.label %>
+                  </option>
+                  <% }) %>
+                </select>
               </form>
             </div>
 
