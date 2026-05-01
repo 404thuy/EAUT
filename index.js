@@ -93,6 +93,7 @@ app.get("/schedule", (req, res) => {
 
 app.get("/schedule/week", async (req, res) => {
   const selectedWeek = req.query.week || "";
+  const selectedSemester = req.query.semester || "";
   const saved = req.session.studentLogin;
 
   if (!saved?.username || !saved?.password) {
@@ -102,6 +103,7 @@ app.get("/schedule/week", async (req, res) => {
   try {
     const result = await getStudentSchedule(saved.username, saved.password, {
       preferredWeek: selectedWeek,
+      preferredSemester: selectedSemester,
       strictWeek: true,
       useCache: !req.query.refresh,
     });

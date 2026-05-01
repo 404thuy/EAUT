@@ -708,9 +708,10 @@ function setCache(key, data) {
 
 async function getStudentSchedule(username, password, options = {}) {
   const preferredWeek = options.preferredWeek || null;
+  const preferredSemester = options.preferredSemester || null;
   const strictWeek = Boolean(options.strictWeek);
 
-  const key = cacheKey(username, "weekly", { preferredWeek, strictWeek });
+  const key = cacheKey(username, "weekly", { preferredWeek, preferredSemester, strictWeek });
   if (options.useCache !== false) {
     const cached = getFromCache(key);
     if (cached) return cached;
@@ -738,15 +739,22 @@ async function getStudentSchedule(username, password, options = {}) {
 
   // 1. Handle Semester Selection
   const semesters = extractSemesterOptions($schedule);
+  let selectedSemesterObj = null;
   if (semesters.length > 0) {
-    const latestSemester = semesters[semesters.length - 1];
-    if (!latestSemester.selected) {
+    if (preferredSemester) {
+       selectedSemesterObj = semesters.find(s => s.value === preferredSemester);
+    }
+    if (!selectedSemesterObj) {
+       selectedSemesterObj = semesters[semesters.length - 1];
+    }
+    
+    if (!selectedSemesterObj.selected) {
       const hidden = extractHiddenFields($schedule);
       const semPayload = {
         ...hidden,
         __EVENTTARGET: $("#drpHocKy").length ? "drpHocKy" : "cmbHocKy",
         __EVENTARGUMENT: "",
-        [$("#drpHocKy").length ? "drpHocKy" : "cmbHocKy"]: latestSemester.value,
+        [$("#drpHocKy").length ? "drpHocKy" : "cmbHocKy"]: selectedSemesterObj.value,
       };
       scheduleResponse = await client.post(
         scheduleUrl,
@@ -754,6 +762,8 @@ async function getStudentSchedule(username, password, options = {}) {
         { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
       );
       $schedule = cheerio.load(scheduleResponse.data);
+      // Update week options since semester changed
+      semesters.forEach(s => s.selected = s.value === selectedSemesterObj.value);
     }
   }
 
@@ -826,6 +836,12 @@ async function getStudentSchedule(username, password, options = {}) {
       value: item.value,
       selected: item.selected,
     })),
+    semesterOptions: semesters.map((item) => ({
+      label: item.label,
+      value: item.value,
+      selected: item.selected,
+    })),
+    selectedSemesterValue: selectedSemesterObj?.value || null,
     autoSwitchedWeek: resolvedFromAnotherWeek,
     originalWeekLabel,
     studentName,
