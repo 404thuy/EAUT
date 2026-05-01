@@ -139,7 +139,8 @@
   <body>
     <div class="app-shell">
       <div class="sidebar-backdrop" data-sidebar-backdrop style="position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); z-index:950; display:none;"></div>
-      <div class="app-layout">
+      <div class="app-layout-wrapper">
+        <div class="app-layout">
         <aside class="sidebar" data-sidebar>
           <a class="sidebar-brand" href="/">
             <div class="brand-badge" aria-hidden="true">
@@ -858,8 +859,17 @@
                         </div>
                         <div style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.75rem;">
                           <span style="flex: 0 0 16px; text-align: center; opacity: 0.8; margin-top: 1px;">📍</span>
-                          <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4;">
-                            Phòng: <strong style="color: var(--text-main);"><%= item.schedules.some(s => s.includes('E-learning')) && item.room === 'Đang cập nhật' ? 'E-learning' : item.room %></strong>
+                          <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4; display: flex; align-items: flex-start; gap: 4px;">
+                            <span style="white-space: nowrap;">Phòng:</span>
+                            <div style="color: var(--text-main); flex: 1; display: flex; flex-direction: column; font-weight: bold;">
+                              <% 
+                                let rText = item.schedules.some(s => s.includes('E-learning')) && item.room === 'Đang cập nhật' ? 'E-learning' : item.room;
+                                let rList = rText.split(' | ');
+                              %>
+                              <% rList.forEach((r) => { %>
+                                <span><%= r %></span>
+                              <% }) %>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1062,6 +1072,7 @@
 
         </div>
       </div>
+    </div>
     </div>
     <div id="loadingOverlay" class="loading-overlay is-hidden">
       <div class="loading-content">
