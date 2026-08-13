@@ -43,23 +43,62 @@ function setCache(key, data) {
 // ─── Puppeteer Singleton Browser Management ────────────────────────────
 let _browser = null;
 async function getBrowser() {
-  const { default: puppeteer } = await import("puppeteer");
   if (_browser && _browser.connected) return _browser;
-  _browser = await puppeteer.launch({
-    headless: "new",
-    ignoreHTTPSErrors: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-web-security",
-      "--ignore-certificate-errors",
-      "--ignore-certificate-errors-spki-list",
-      "--disable-gpu",
-      "--disable-dev-shm-usage",
-    ],
-  });
+
+  const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+  const execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+
+  if (execPath) {
+    // ── Railway / Render / Docker: dùng Chrome hệ thống ──────────────
+    console.log(`[BROWSER] Using system Chrome: ${execPath}`);
+    const { default: puppeteerCore } = await import("puppeteer-core");
+    _browser = await puppeteerCore.launch({
+      headless: true,
+      executablePath: execPath,
+      ignoreHTTPSErrors: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-gpu",
+        "--disable-dev-shm-usage",
+        "--disable-web-security",
+        "--ignore-certificate-errors",
+      ],
+    });
+  } else if (isVercel) {
+    // ── Vercel Serverless: dùng @sparticuz/chromium ───────────────────
+    console.log("[BROWSER] Using @sparticuz/chromium for Vercel");
+    const { default: chromium } = await import("@sparticuz/chromium");
+    const { default: puppeteerCore } = await import("puppeteer-core");
+    _browser = await puppeteerCore.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
+    });
+  } else {
+    // ── Local: dùng puppeteer với Chrome đóng gói sẵn ─────────────────
+    console.log("[BROWSER] Using bundled Puppeteer Chrome (local)");
+    const { default: puppeteer } = await import("puppeteer");
+    _browser = await puppeteer.launch({
+      headless: "new",
+      ignoreHTTPSErrors: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-web-security",
+        "--ignore-certificate-errors",
+        "--ignore-certificate-errors-spki-list",
+        "--disable-gpu",
+        "--disable-dev-shm-usage",
+      ],
+    });
+  }
+
   return _browser;
 }
+
 
 // ─── Worker Pool & Concurrency Semaphore Queue ─────────────────────────
 const MAX_CONCURRENT_TASKS = 4;
