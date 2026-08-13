@@ -1,696 +1,22 @@
-const axios = require("axios");
-const { wrapper } = require("axios-cookiejar-support");
-const cheerio = require("cheerio");
-const { CookieJar } = require("tough-cookie");
-const https = require("https");
+const path = require("path");
+const crypto = require("crypto");
 
-// Simple in-memory cache for schedule data
-// Key format: `${username}|${type}|${JSON.stringify(options)}`
+// ─── Cache Management & Change Detection ──────────────────────────────
 const scheduleCache = new Map();
-// Cache TTL in milliseconds (5 minutes)
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes TTL
 
-// Helper to perform a request with retry logic
-async function requestWithRetry(requestFn, retries = 2) {
-  let lastError;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      return await requestFn();
-    } catch (err) {
-      lastError = err;
-      // Simple backoff
-      await new Promise((res) => setTimeout(res, 300 * (attempt + 1)));
-    }
-  }
-  throw lastError;
-}
-
-const BASE_URL = process.env.EAUT_BASE_URL || "https://sinhvien.eaut.edu.vn";
-const LOGIN_PATH = process.env.EAUT_LOGIN_PATH || "/login.aspx";
-const LOGIN_PATH_CANDIDATES = [LOGIN_PATH, "/login.aspx", "/Login.aspx", "/"];
-const SCHEDULE_PATH_CANDIDATES = [
-  "/wfrmLichHocSinhVienTinChi.aspx",
-  "/wfrmDangKyLopTinChiB3.aspx",
-];
-const SCHEDULE_KEYWORDS = [
-  "lich hoc",
-  "thoi khoa bieu",
-  "xem lich hoc ky",
-  "xem lich hoc tuan",
-];
-
-function cleanText(value) {
-  return (value || "").replace(/\s+/g, " ").trim();
-}
-
-function stripVietnamese(value) {
-  return (value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D");
-}
-
-function normalizeText(value) {
-  return stripVietnamese(cleanText(value)).toLowerCase();
-}
-
-function norm(value) {
-  return normalizeText(value);
-}
-
-function pickLoginForm($) {
-  const forms = $("form").toArray();
-  if (forms.length === 0) {
-    throw new Error("Khong tim thay form dang nhap tren cong sinh vien.");
-  }
-
-  const withPassword = forms.find((form) =>
-    $(form).find('input[type="password"]').length > 0
-  );
-  return withPassword || forms[0];
-}
-
-function buildLoginPayload($, formNode, username, password) {
-  const payload = {};
-  const form = $(formNode);
-  const inputs = form.find("input").toArray();
-
-  let usernameField = null;
-  let passwordField = null;
-
-  for (const input of inputs) {
-    const name = $(input).attr("name");
-    if (!name) {
-      continue;
-    }
-
-    const type = ($(input).attr("type") || "text").toLowerCase();
-    const value = $(input).attr("value") || "";
-    payload[name] = value;
-
-    if (!passwordField && type === "password") {
-      passwordField = name;
-    }
-
-    const lowerName = name.toLowerCase();
-    const isTextLike = ["text", "email", "tel"].includes(type);
-    if (
-      !usernameField &&
-      isTextLike &&
-      (lowerName.includes("user") ||
-        lowerName.includes("email") ||
-        lowerName.includes("login") ||
-        lowerName.includes("tai") ||
-        lowerName.includes("masv") ||
-        lowerName.includes("mssv"))
-    ) {
-      usernameField = name;
-    }
-  }
-
-  if (!usernameField || !passwordField) {
-    throw new Error("Khong xac dinh duoc truong tai khoan/mat khau tu form dang nhap.");
-  }
-
-  payload[usernameField] = username;
-  payload[passwordField] = password;
-
-  return payload;
-}
-
-function resolveActionUrl($, formNode) {
-  const action = $(formNode).attr("action") || LOGIN_PATH;
-  return new URL(action, BASE_URL).toString();
-}
-
-async function performLogin(client, username, password) {
-  let loginPage = null;
-  for (const candidatePath of LOGIN_PATH_CANDIDATES) {
-    try {
-      loginPage = await client.get(new URL(candidatePath, BASE_URL).toString());
-      break;
-    } catch (_e) {}
-  }
-
-  if (!loginPage) throw new Error("Không thể truy cập trang đăng nhập EAUT.");
-
-  const $login = cheerio.load(loginPage.data);
-  const formNode = pickLoginForm($login);
-  const actionUrl = resolveActionUrl($login, formNode);
-  const payload = buildLoginPayload($login, formNode, username, password);
-
-  const submitResponse = await client.post(
-    actionUrl,
-    new URLSearchParams(payload).toString(),
-    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-  );
-  const $afterLogin = cheerio.load(submitResponse.data);
-
-  if (!looksLikeLoggedIn($afterLogin)) {
-    throw new Error("Đăng nhập thất bại. Vui lòng kiểm tra lại mã sinh viên và mật khẩu.");
-  }
-
-  // Extract student name from header using exact UniSoft IDs
-  let studentName = "";
+function computeHash(obj) {
   try {
-    const nameEl = $afterLogin("#HeaderSV1_lblHo_ten, #lblHoTen, .na span");
-    if (nameEl.length) {
-      studentName = cleanText(nameEl.first().text());
-    }
-    
-    if (!studentName || /^\d+$/.test(studentName)) {
-      // Fallback: search for greeting patterns or other common locations
-      const profile = $afterLogin(".user-profile, .profile, .btn-dropdown, .dropdown-toggle");
-      studentName = cleanText(profile.find(".na span, span, b, strong").first().text());
-    }
-
-    if (!studentName || /^\d+$/.test(studentName)) {
-      const pageText = $afterLogin("body").text();
-      const match = pageText.match(/(?:Xin chào|Chào|Sinh viên|Hi)[:\s,]+([^|!( \n]+(?:\s+[^|!( \n]+){1,4})/i);
-      if (match) studentName = cleanText(match[1]);
-    }
-  } catch (_e) {}
-
-  return { client, $afterLogin, studentName: studentName || "Sinh viên" };
+    return crypto.createHash("sha256").update(JSON.stringify(obj || {})).digest("hex");
+  } catch (e) {
+    return "";
+  }
 }
 
-function looksLikeLoggedIn($) {
-  const pageText = normalizeText($("body").text());
-  const hasLogout = pageText.includes("dang xuat") || pageText.includes("logout");
-  const hasStudentId = $("#HeaderSV1_lblMa_sv, #lblMaSV").length > 0 || /\d{8,}/.test($(".user-info, .na span").text());
-  return hasLogout && hasStudentId;
-}
-
-function findScheduleUrl($) {
-  // Weekly schedule is the user's primary target.
-  const directWeek = $("#XemLichHocTuan").attr("href");
-  if (directWeek) {
-    return new URL(directWeek, BASE_URL).toString();
-  }
-
-  // The portal often marks the semester schedule menu with this id.
-  const directById = $("#XemLichHocKy").attr("href");
-  if (directById) {
-    return new URL(directById, BASE_URL).toString();
-  }
-
-  const links = $("a").toArray();
-  for (const link of links) {
-    const text = normalizeText($(link).text());
-    const href = $(link).attr("href");
-    if (!href) {
-      continue;
-    }
-    if (SCHEDULE_KEYWORDS.some((keyword) => text.includes(keyword))) {
-      return new URL(href, BASE_URL).toString();
-    }
-  }
-  return null;
-}
-
-function scoreScheduleTable($, tableNode) {
-  const table = $(tableNode);
-  const text = normalizeText(table.text());
-  const rows = table.find("tr").length;
-  const cells = table.find("td").length;
-  let score = 0;
-
-  if (rows >= 4) score += 3;
-  if (cells >= 12) score += 3;
-  if (text.includes("thu")) score += 2;
-  if (text.includes("ngay")) score += 2;
-  if (text.includes("phong")) score += 2;
-  if (text.includes("giang vien")) score += 2;
-  if (text.includes("tiet")) score += 2;
-
-  return score;
-}
-
-function extractScheduleTable($) {
-  const tables = $("table").toArray();
-  if (tables.length === 0) {
-    return null;
-  }
-
-  let bestTable = tables[0];
-  let bestScore = -1;
-  for (const tableNode of tables) {
-    const score = scoreScheduleTable($, tableNode);
-    if (score > bestScore) {
-      bestScore = score;
-      bestTable = tableNode;
-    }
-  }
-
-  // If all tables are weak matches, return null and try text fallback.
-  if (bestScore < 3) {
-    return null;
-  }
-
-  const headers = [];
-  $(bestTable)
-    .find("thead tr th")
-    .each((_index, th) => headers.push(cleanText($(th).text())));
-
-  if (headers.length === 0) {
-    $(bestTable)
-      .find("tr")
-      .first()
-      .find("th,td")
-      .each((_index, cell) => headers.push(cleanText($(cell).text())));
-  }
-
-  const rows = [];
-  $(bestTable).find("tbody tr").each((_index, tr) => {
-    const row = [];
-    $(tr)
-      .find("td")
-      .each((_cellIndex, cell) => row.push(cleanText($(cell).text())));
-    if (row.length > 0) {
-      rows.push(row);
-    }
-  });
-
-  if (rows.length === 0) {
-    $(bestTable)
-      .find("tr")
-      .slice(1)
-      .each((_index, tr) => {
-      const row = [];
-      $(tr)
-        .find("td")
-        .each((_cellIndex, cell) => row.push(cleanText($(cell).text())));
-      if (row.length > 0) {
-        rows.push(row);
-      }
-      });
-  }
-
-  return { headers, rows };
-}
-
-function parseWeeklySessionText(text) {
-  // Normalize Unicode to handle both composed and decomposed accents
-  const normalized = cleanText(String(text || "").normalize("NFC").replace(/\s*<br\s*\/?>\s*/gi, "\n"));
-  if (!normalized) return null;
-
-  // Flexible regex for periods: Tiết [học]: 4-6 or 4 - 6 or 4—6
-  const periodMatch = normalized.match(/(?:Ti\S+\s+h\S+|Ti\S+|T\S+h)[:\s]*(\d+)\s*[-–—]\s*(\d+)/i);
-  // Teacher: capture until the next clearly labeled field (not just "Ma" which can appear in names)
-  const teacherMatch = normalized.match(/(?:GV|Gi[aả]ng\s*vi[eê]n|Giang\s*vien)[:\s]+(.+?)(?=\s*(?:Ph[oò]ng|H[iì]nh\s*th[ứu]c|M[aã]\s*l[oớ]p|Ti[eê]t|$))/i);
-  const classMatch = normalized.match(/(?:M\S+\s+l\S+|Mã\s*lớp)[:\s]*([^|]+?)(?=\s*(?:GV|Phong|Phòng|Hinh|Hình|Ti[eê]t|$))/i);
-  const modeMatch = normalized.match(/(?:H\S+\s+th\S+|Hình\s*thức)[:\s]*([^|]+?)(?=\s*(?:GV|Phong|Phòng|M[aã]|Ti[eê]t|$))/i);
-
-  const roomMatches = [...normalized.matchAll(/(?:Phong|Phòng)[:\s]*([^|]+?)(?=\s*(?:GV|Giảng|Hinh|Hình|M[aã]|Ti[eê]t|$))/gi)];
-  let room = "Đang cập nhật";
-  if (roomMatches.length > 0) {
-    const bestRoom = roomMatches.find((m) => !/Thứ\s+\d/i.test(m[1])) || roomMatches[0];
-    room = cleanText(bestRoom[1]);
-  }
-
-  // Split the course name by ANY keyword
-  const keywords = [
-    "Ti[eê]t\\s*h[oọ]c", "Ti[eê]t", "M[aã]\\s*l[oớ]p", "GV", 
-    "Giang\\s*vi[eê]n", "Giảng\\s*viên", "Phong", "Phòng", 
-    "H[iì]nh\\s*th[ứu]c", "Hình\\s*thức", "Thu", "Thứ"
-  ];
-  const splitRegex = new RegExp(`(?:${keywords.join("|")})`, "i");
-  const courseRaw = normalized.split(splitRegex)[0]
-    .replace(/^Sang|^Chieu|^Toi|^Sáng|^Chiều|^Tối/i, "")
-    .trim();
-  const course = cleanText(courseRaw.replace(/^Lop hoc[:\-]?\s*|^Lớp\s*học[:\-]?\s*/i, ""));
-
-  let periodStart = "-";
-  let periodCount = "-";
-  let time = "-";
-  if (periodMatch) {
-    const start = Number(periodMatch[1]);
-    const end = Number(periodMatch[2]);
-    if (Number.isFinite(start) && Number.isFinite(end)) {
-      periodStart = String(start);
-      periodCount = String(Math.max(end - start + 1, 1));
-      time = `${start}-${end}`;
-    }
-  }
-
-  return {
-    course: course || "Môn học",
-    teacher: cleanText(teacherMatch ? teacherMatch[1] : "") || "Đang cập nhật",
-    room: room || "Đang cập nhật",
-    periodStart,
-    periodCount,
-    time,
-    classCode: cleanText(classMatch ? classMatch[1] : ""),
-    mode: cleanText(modeMatch ? modeMatch[1] : ""),
-  };
-}
-
-function extractScheduleFromWeeklyGrid($) {
-  // Try multiple known IDs for the weekly grid
-  const grid = $("#gridLichHoc, #grdViewLopDangKy, #gridLich").first();
-  if (!grid.length) return null;
-
-  const headers = [];
-  grid.find("tr").first().find("th").each((_idx, th) => {
-    headers.push(cleanText($(th).text()));
-  });
-
-  // Weekly screen may be empty: header exists but no data cells.
-  if (headers.length <= 1) {
-    return { headers: [], rows: [] };
-  }
-
-  const dayColumns = headers.slice(1).map((label) => {
-    const m = label.match(/^(.*?),\s*(\d{1,2}\/\d{1,2}\/\d{4})$/);
-    if (!m) {
-      return { day: label || "Khong ro thu", date: "" };
-    }
-    return { day: cleanText(m[1]), date: cleanText(m[2]) };
-  });
-
-  const rows = [];
-  grid.find("tr").slice(1).each((_rowIndex, tr) => {
-    const cells = $(tr).find("td");
-    if (!cells.length) return;
-    const sessionLabel = cleanText($(cells[0]).text()) || "";
-
-    cells.slice(1).each((cellIndex, td) => {
-      const dayMeta = dayColumns[cellIndex] || { day: "Khong ro thu", date: "" };
-      const blockNodes = $(td).find("p.hocthuong, p.hocbu, p.nghihoc, .hocthuong, .hocbu, .nghihoc");
-      if (!blockNodes.length) return;
-
-      blockNodes.each((_i, node) => {
-        const html = ($(node).html() || "").replace(/<br\s*\/?>/gi, "\n");
-        const text = cleanText(html.replace(/<[^>]+>/g, " "));
-        const parsed = parseWeeklySessionText(text);
-        if (!parsed) return;
-
-        rows.push([
-          dayMeta.day,
-          dayMeta.date,
-          parsed.course,
-          parsed.room,
-          parsed.teacher,
-          parsed.periodStart,
-          parsed.periodCount,
-          parsed.time,
-          sessionLabel || "-",
-          parsed.classCode || "-",
-          parsed.mode || "-",
-        ]);
-      });
-    });
-  });
-
-  return {
-    headers: [
-      "Thu",
-      "Ngay",
-      "Mon hoc",
-      "Phong",
-      "Giang vien",
-      "Tiet bat dau",
-      "So tiet",
-      "Gio hoc",
-      "Ca hoc",
-      "Ma lop",
-      "Hinh thuc hoc",
-    ],
-    rows,
-  };
-}
-
-function extractScheduleTextBlocks($) {
-  const selectors = ["p.hocthuong", "p.nghihoc", "p.hocbu", ".hocthuong", ".nghihoc", ".hocbu"];
-  const rows = [];
-
-  for (const selector of selectors) {
-    $(selector).each((_index, node) => {
-      const text = cleanText($(node).text());
-      if (text) {
-        rows.push([text]);
-      }
-    });
-  }
-
-  if (rows.length === 0) {
-    return null;
-  }
-
-  return {
-    headers: ["Chi tiet lich hoc"],
-    rows,
-  };
-}
-
-function extractHiddenFields($) {
-  const fields = {};
-  $("input[type='hidden'][name]").each((_index, node) => {
-    const name = $(node).attr("name");
-    if (!name) return;
-    fields[name] = $(node).val() || "";
-  });
-  return fields;
-}
-
-function extractWeekOptions($) {
-  const options = [];
-  $("#cmbTuan_thu option").each((_index, node) => {
-    options.push({
-      value: $(node).attr("value") || "",
-      label: cleanText($(node).text()),
-      selected: $(node).is(":selected"),
-    });
-  });
-  return options.filter((option) => option.value);
-}
-
-function extractWeekMeta($) {
-  const options = extractWeekOptions($);
-  const selected = options.find((item) => item.selected) || null;
-  return { options, selected };
-}
-
-function extractTermScheduleFromGrid($) {
-  // 1. Try known IDs
-  let grid = $("#grdKetQua, #grdDangKy, #grdLopDangKy, #grdViewLopDangKy").first();
-  
-  // 2. Fallback: Find the largest table with "Ma hoc phan" or similar content
-  if (!grid.length) {
-    const tables = $("table").toArray();
-    let bestScore = -1;
-    for (const t of tables) {
-      const text = normalizeText($(t).text());
-      let score = 0;
-      if (text.includes("ma hoc phan") || text.includes("ma lop")) score += 5;
-      if (text.includes("ten hoc phan") || text.includes("tin chi")) score += 5;
-      if (text.includes("lich hoc") || text.includes("ca hoc")) score += 5;
-      if (text.includes("giao vien") || text.includes("giang vien")) score += 3;
-      if (score > bestScore) {
-        bestScore = score;
-        grid = $(t);
-      }
-    }
-  }
-
-  if (!grid || !grid.length) return { headers: [], rows: [] };
-
-  const headers = [];
-  grid.find("tr").first().find("th, td.header, .header").each((_i, th) => {
-    headers.push(cleanText($(th).text()));
-  });
-
-  const rows = [];
-  let lastRowData = [];
-
-  grid.find("tr").slice(1).each((_idx, tr) => {
-    const cells = $(tr).find("td").toArray().map(td => {
-      // Replace <br> and block tags with a separator so text doesn't collapse
-      let html = $(td).html() || "";
-      html = html.replace(/<br\s*\/?>/gi, " | ");
-      html = html.replace(/<\/(p|div|li|h[1-6])>/gi, " | ");
-      const text = cheerio.load(html).text();
-      return cleanText(text.replace(/\|\s*\|/g, "|").replace(/(^\|\s*|\s*\|$)/g, ""));
-    });
-    if (cells.length < 3) return; // Skip separator/empty rows
-
-    const processedRow = cells.map((cell, i) => {
-      // Use merging logic for leading columns (ID, Name, Credits, Class)
-      if (!cell && i < 4 && lastRowData[i]) {
-        return lastRowData[i];
-      }
-      return cell;
-    });
-
-    if (processedRow.some(c => c)) {
-      rows.push(processedRow);
-      lastRowData = processedRow;
-    }
-  });
-
-  return { headers, rows };
-}
-
-function extractExamScheduleFromGrid($) {
-  let grid = null;
-  const possibleIds = ["#grd", "#grdView", "#gvLichThi", "#gvLichThiSinhVien", "#grdLichThi", "#grdKetQua", "#grdDangKy", "table.grid", "table.table-hover"];
-  for (const id of possibleIds) {
-    const t = $(id);
-    if (t.length) {
-      const text = normalizeText(t.text());
-      if (text.includes("mon") || text.includes("hoc phan") || text.includes("lich thi")) {
-        grid = t;
-        break;
-      }
-    }
-  }
-
-  if (!grid) {
-    // Aggressive search: ANY table containing "Phòng thi" or "Số báo danh"
-    $("table").each((_i, t) => {
-      const text = normalizeText($(t).text());
-      if ((text.includes("phong thi") || text.includes("so bao danh") || text.includes("sbd")) && 
-          (text.includes("mon") || text.includes("hoc phan") || text.includes("ngay thi"))) {
-        grid = $(t);
-        return false; // break
-      }
-    });
-  }
-  
-  if (!grid || !grid.length) return { headers: [], rows: [] };
-
-  const headers = [];
-  grid.find("tr").first().find("th, td.header, .header").each((_i, th) => {
-    headers.push(cleanText($(th).text()));
-  });
-
-  const findIdx = (p, exclude = []) => {
-    return headers.findIndex((h, i) => {
-      if (exclude.includes(i)) return false;
-      const nh = norm(h);
-      return p.some(x => {
-          const nx = normalizeText(x);
-          if (nx.includes(" ")) return nh === nx || nh.includes(nx); 
-          return nh === nx || nh.split(" ").includes(nx);
-      });
-    });
-  };
-
-  const idxHk = findIdx(["hoc ky", "nam hoc", "hk"]);
-  const idxSubject = findIdx(["hoc phan", "ten mon", "mon hoc"], [idxHk].filter(x => x >= 0));
-  const idxAttempt = findIdx(["lan thi", "lan"], [idxHk, idxSubject].filter(x => x >= 0));
-  const idxPhase = findIdx(["dot thi", "dot"], [idxHk, idxSubject, idxAttempt].filter(x => x >= 0));
-  const idxDate = findIdx(["ngay thi", "ngay"], [idxHk, idxSubject, idxAttempt, idxPhase].filter(x => x >= 0));
-  const idxShift = findIdx(["buoi thi", "buoi"], [idxHk, idxSubject, idxAttempt, idxPhase, idxDate].filter(x => x >= 0));
-  const idxTime = findIdx(["gio thi", "gio"], [idxHk, idxSubject, idxAttempt, idxPhase, idxDate, idxShift].filter(x => x >= 0));
-  const idxRoom = findIdx(["phong thi", "phong"], [idxHk, idxSubject, idxAttempt, idxPhase, idxDate, idxShift, idxTime].filter(x => x >= 0));
-  const idxSbd = findIdx(["so bao danh", "sbd"], [idxHk, idxSubject, idxAttempt, idxPhase, idxDate, idxShift, idxTime, idxRoom].filter(x => x >= 0));
-  const idxFormat = findIdx(["hinh thuc thi", "hinh thuc"], [idxHk, idxSubject, idxAttempt, idxPhase, idxDate, idxShift, idxTime, idxRoom, idxSbd].filter(x => x >= 0));
-
-  const rows = [];
-  let lastHk = "Học kỳ hiện tại";
-
-  grid.find("tr").slice(1).each((_idx, tr) => {
-    let cells = $(tr).find("td").toArray().map(td => {
-      let html = $(td).html() || "";
-      html = html.replace(/<br\s*\/?>/gi, " | ");
-      const text = cheerio.load(html).text();
-      return cleanText(text.replace(/\|\s*\|/g, "|").replace(/(^\|\s*|\s*\|$)/g, ""));
-    });
-    
-    if (cells.length < 3) return;
-
-    // Handle rowspan: If first cell is missing, it means it's spanned from above
-    if (cells.length < headers.length) {
-       cells.unshift("");
-    }
-
-    let rowHk = idxHk >= 0 ? cells[idxHk] : "";
-    if (rowHk && (rowHk.includes("HK:") || rowHk.includes("Học kỳ") || rowHk.includes("NH:"))) {
-      lastHk = rowHk;
-    } else {
-      rowHk = lastHk;
-    }
-
-    const getVal = (idx) => (idx >= 0 ? cells[idx] || "-" : "-");
-    
-    rows.push([
-      rowHk,
-      getVal(idxSubject),
-      getVal(idxAttempt),
-      getVal(idxPhase),
-      getVal(idxDate),
-      getVal(idxShift),
-      getVal(idxTime),
-      getVal(idxRoom),
-      getVal(idxSbd),
-      getVal(idxFormat)
-    ]);
-  });
-
-  return { headers: ["HK", "Môn", "Lần", "Đợt", "Ngày", "Buổi", "Giờ", "Phòng", "SBD", "Hình thức"], rows };
-}
-
-function extractTableData($) {
-  const fromWeeklyGrid = extractScheduleFromWeeklyGrid($);
-  if (fromWeeklyGrid) return fromWeeklyGrid;
-
-  const regTableIds = ["#grdKetQua", "#grdDangKy", "#grdLopDangKy", "#grdLichHoc"];
-  for (const id of regTableIds) {
-    if ($(id).length) {
-      // If it's the weekly grid, use the specific extractor
-      if (id === "#grdLichHoc") {
-        const weekly = extractScheduleFromWeeklyGrid($);
-        if (weekly && weekly.rows.length > 0) return weekly;
-      }
-      return extractTermScheduleFromGrid($);
-    }
-  }
-
-  const fromTable = extractScheduleTable($);
-  if (fromTable && fromTable.rows.length > 0) return fromTable;
-
-  const fromText = extractScheduleTextBlocks($);
-  if (fromText) return fromText;
-
-  return { headers: [], rows: [] };
-}
-
-function extractSemesterOptions($) {
-  const options = [];
-  const select = $("select").filter((_i, el) => {
-    const text = $(el).text();
-    const name = $(el).attr("name") || "";
-    const id = $(el).attr("id") || "";
-    const normalizedText = normalizeText(text);
-    return normalizedText.includes("hoc ky") || 
-           normalizedText.includes("nam hoc") || 
-           name.toLowerCase().includes("hocky") ||
-           id.toLowerCase().includes("hocky") ||
-           name.toLowerCase().includes("semester");
-  }).first();
-
-  if (select.length) {
-    const name = select.attr("name");
-    select.find("option").each((_index, node) => {
-      options.push({
-        value: $(node).attr("value") || "",
-        label: cleanText($(node).text()),
-        selected: $(node).is(":selected") || $(node).attr("selected") === "selected",
-        fieldName: name
-      });
-    });
-  }
-  return options.filter((opt) => opt.value);
-}
-
-// Helper to generate a cache key
 function cacheKey(username, type, options) {
   return `${username}|${type}|${JSON.stringify(options)}`;
 }
 
-// Retrieve from cache if fresh
 function getFromCache(key) {
   const entry = scheduleCache.get(key);
   if (!entry) return null;
@@ -701,9 +27,980 @@ function getFromCache(key) {
   return entry.data;
 }
 
-// Store result in cache
 function setCache(key, data) {
-  scheduleCache.set(key, { data, timestamp: Date.now() });
+  if (!data) return;
+  const dataHash = computeHash(data);
+  const enrichedData = {
+    ...data,
+    _metadata: {
+      cachedAt: new Date().toISOString(),
+      dataHash: dataHash,
+    },
+  };
+  scheduleCache.set(key, { data: enrichedData, timestamp: Date.now(), hash: dataHash });
+}
+
+// ─── Puppeteer Singleton Browser Management ────────────────────────────
+let _browser = null;
+async function getBrowser() {
+  const puppeteer = require("puppeteer");
+  if (_browser && _browser.connected) return _browser;
+  _browser = await puppeteer.launch({
+    headless: "new",
+    ignoreHTTPSErrors: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-web-security",
+      "--ignore-certificate-errors",
+      "--ignore-certificate-errors-spki-list",
+      "--disable-gpu",
+      "--disable-dev-shm-usage",
+    ],
+  });
+  return _browser;
+}
+
+// ─── Worker Pool & Concurrency Semaphore Queue ─────────────────────────
+const MAX_CONCURRENT_TASKS = 4;
+let _activeCount = 0;
+const _taskQueueList = [];
+
+function enqueueTask(fn) {
+  return new Promise((resolve, reject) => {
+    const runTask = async () => {
+      _activeCount++;
+      const startTime = Date.now();
+      try {
+        console.log(`[CRAWL WORKER] Start task. Active workers: ${_activeCount}/${MAX_CONCURRENT_TASKS}`);
+        const result = await fn();
+        console.log(`[CRAWL WORKER] Task completed in ${Date.now() - startTime}ms.`);
+        resolve(result);
+      } catch (err) {
+        console.error(`[CRAWL WORKER] Task failed in ${Date.now() - startTime}ms: ${err.message}`);
+        reject(err);
+      } finally {
+        _activeCount--;
+        if (_taskQueueList.length > 0) {
+          const next = _taskQueueList.shift();
+          next();
+        }
+      }
+    };
+
+    if (_activeCount < MAX_CONCURRENT_TASKS) {
+      runTask();
+    } else {
+      console.log(`[CRAWL QUEUE] Task queued (active: ${_activeCount}, queue length: ${_taskQueueList.length + 1})`);
+      _taskQueueList.push(runTask);
+    }
+  });
+}
+
+// ─── Request Interception for Speed Optimization ───────────────────────
+async function setupPageInterception(page) {
+  await page.setRequestInterception(true);
+  page.on("request", (req) => {
+    const resourceType = req.resourceType();
+    const url = req.url().toLowerCase();
+
+    // Block non-essential media, fonts, styles & tracking
+    if (
+      resourceType === "image" ||
+      resourceType === "font" ||
+      resourceType === "media" ||
+      url.includes("google-analytics") ||
+      url.includes("firebase") ||
+      url.includes("socket.io") ||
+      url.includes("mathjax") ||
+      url.includes("slick") ||
+      url.includes("swiper")
+    ) {
+      req.abort();
+    } else {
+      req.continue();
+    }
+  });
+}
+
+// ─── Core: Login and Prepare an Authenticated Page ─────────────────────
+async function createAuthenticatedPage(username, password) {
+  const MAX_LOGIN_RETRIES = 3;
+
+  for (let attempt = 1; attempt <= MAX_LOGIN_RETRIES; attempt++) {
+    const browser = await getBrowser();
+    const context = typeof browser.createBrowserContext === "function"
+      ? await browser.createBrowserContext()
+      : typeof browser.createIncognitoBrowserContext === "function"
+      ? await browser.createIncognitoBrowserContext()
+      : browser.defaultBrowserContext();
+
+    const page = await context.newPage();
+    await page.setViewport({ width: 1280, height: 800 });
+
+    try {
+      // 1. Navigate to login page naturally (full JS/CSS bundles)
+      await page.goto("https://qldt.eaut.edu.vn/congthongtin/login.aspx#diemhoc", {
+        waitUntil: "domcontentloaded",
+        timeout: 45000,
+      });
+
+      const isLoginFormPresent = await page.waitForSelector('#username', { timeout: 5000 }).catch(() => null);
+
+      if (isLoginFormPresent) {
+        await page.focus('#username');
+        await page.$eval('#username', (el) => (el.value = ''));
+        await page.type('#username', username, { delay: 15 });
+
+        await page.focus('#password');
+        await page.$eval('#password', (el) => (el.value = ''));
+        await page.type('#password', password, { delay: 15 });
+
+        await Promise.all([
+          page.click('#cms_authenticate_do_login'),
+          page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 25000 }).catch(() => {}),
+        ]);
+      }
+
+      // 2. Wait up to 15s for SPA framework & userId initialization
+      const isAuthenticated = await page.waitForFunction(
+        () =>
+          window.edu &&
+          window.edu.system &&
+          window.edu.system.userId &&
+          typeof window.edu.system.makeRequest === "function",
+        { timeout: 15000 }
+      ).then(() => true).catch(() => false);
+
+      if (!isAuthenticated) {
+        const errorMsg = await page.evaluate(() => {
+          const errEl = document.querySelector("#lblError, .text-danger, .error-message, font[color='red'], div[style*='color: red'], div[style*='color:Red'], #divError");
+          if (errEl && errEl.textContent.trim()) return errEl.textContent.trim();
+          const bodyText = document.body.innerText || "";
+          if (bodyText.includes("ORA-") || bodyText.includes("PL/SQL") || bodyText.includes("QTDHDA")) {
+            return "Hệ thống máy chủ EAUT đang gặp sự cố cơ sở dữ liệu (Oracle Database Error). Vui lòng thử lại sau ít phút.";
+          }
+          return "";
+        });
+
+        if (errorMsg) {
+          throw new Error(`Đăng nhập thất bại: ${errorMsg}`);
+        }
+        throw new Error("Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản và mật khẩu.");
+      }
+
+      const studentName = await page.evaluate(() => {
+        const el = document.querySelector("#lblHoTenNguoiDangNhap");
+        if (el) return el.textContent.trim();
+        const span = document.querySelector(".nav-account button > span");
+        if (span) return span.textContent.trim();
+        return "";
+      });
+
+      // 3. Enable request interception AFTER authentication to speed up data scraping
+      await setupPageInterception(page);
+
+      console.log(`[AUTH SUCCESS] Logged in for ${studentName || username} (${username}) (attempt ${attempt})`);
+      return { browserContext: context, page, studentName };
+    } catch (error) {
+      await page.close().catch(() => {});
+      await context.close().catch(() => {});
+
+      if (error.message.includes("Đăng nhập thất bại")) {
+        throw error;
+      }
+
+      if (attempt < MAX_LOGIN_RETRIES) {
+        console.log(`[AUTH RETRY] Attempt ${attempt} failed (${error.message}), retrying in ${attempt * 1000}ms...`);
+        await new Promise((r) => setTimeout(r, attempt * 1000));
+        continue;
+      }
+
+      throw error;
+    }
+  }
+}
+
+// ─── Helper: Call SPA internal API via page.evaluate ───────────────────
+async function callSPAApi(page, apiAction, apiFunc, params = {}) {
+  return await page.evaluate(
+    async (action, func, extraParams) => {
+      return new Promise((resolve, reject) => {
+        if (!window.edu || !window.edu.system || !window.edu.system.makeRequest) {
+          reject(new Error("SPA framework not initialized"));
+          return;
+        }
+        const requestData = {
+          action: action,
+          func: func,
+          iM: window.edu.system.iM,
+          ...extraParams,
+        };
+        window.edu.system.makeRequest(
+          {
+            success: function (d) {
+              resolve(d);
+            },
+            error: function (err) {
+              reject(new Error("API error: " + JSON.stringify(err)));
+            },
+            type: "POST",
+            action: action,
+            contentType: true,
+            data: requestData,
+            fakedb: [],
+          },
+          false,
+          false,
+          false,
+          null
+        );
+        setTimeout(() => resolve({ Success: false, Data: [] }), 12000);
+      });
+    },
+    apiAction,
+    apiFunc,
+    params
+  );
+}
+
+// ─── Helper: Navigate to a SPA module ──────────────────────────────────
+async function navigateToModule(page, hash, htmlPath, moduleId) {
+  await page.evaluate(
+    (h, p, id) => {
+      if (window.edu && window.edu.system && window.edu.system.initMain) {
+        window.edu.system.initMain(h, p, id);
+      } else {
+        const link = document.querySelector(`a[href="${h}"]`);
+        if (link) link.click();
+      }
+    },
+    hash,
+    htmlPath,
+    moduleId
+  );
+  await new Promise((r) => setTimeout(r, 300));
+}
+
+// ─── Helper: Date & Week Formatter ─────────────────────────────────────
+function formatDate(d) {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+function getWeekRange(referenceDate) {
+  const d = new Date(referenceDate);
+  const day = d.getDay();
+  const diffToMon = day === 0 ? -6 : 1 - day;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + diffToMon);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { start: monday, end: sunday };
+}
+
+function parseDDMMYYYY(str) {
+  if (!str) return null;
+  const parts = str.split("/");
+  if (parts.length !== 3) return null;
+  return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+}
+
+function getDayOfWeek(dateStr) {
+  const d = parseDDMMYYYY(dateStr);
+  if (!d) return "Khong ro";
+  const names = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+  return names[d.getDay()];
+}
+
+function formatSemLabel(raw) {
+  let s = String(raw || "").trim();
+  const m = s.match(/(\d{4})[\_\-\s]+(\d{4})[\_\-\s]+(\d+)/);
+  if (m) return `HK${m[3]} (${m[1]}-${m[2]})`;
+  const m2 = s.match(/học\s*kỳ\s*(\d+).*?(\d{4})\s*[\-\_]?\s*(\d{4})/i);
+  if (m2) return `HK${m2[1]} (${m2[2]}-${m2[3]})`;
+  return s;
+}
+
+function inferSemesterFromDate(dateStr, fallbackSemLabel) {
+  if (!dateStr || dateStr === "-") return fallbackSemLabel || "Học kỳ hiện tại";
+  const parts = dateStr.split("/");
+  if (parts.length !== 3) return fallbackSemLabel || "Học kỳ hiện tại";
+
+  const month = parseInt(parts[1], 10);
+  let year = parseInt(parts[2], 10);
+  if (year < 100) year += 2000;
+  if (isNaN(month) || isNaN(year)) return fallbackSemLabel || "Học kỳ hiện tại";
+
+  let startYear, endYear, hkNum;
+  if (month >= 9) {
+    startYear = year;
+    endYear = year + 1;
+    hkNum = 1;
+  } else if (month <= 2) {
+    startYear = year - 1;
+    endYear = year;
+    hkNum = 1;
+  } else {
+    startYear = year - 1;
+    endYear = year;
+    hkNum = 2;
+  }
+
+  return `HK${hkNum} (${startYear}-${endYear})`;
+}
+
+// ─── INTERNAL FETCHERS (Run on an open Puppeteer Page) ────────────────
+
+async function fetchWeeklyScheduleInternal(page, username, studentName, options = {}) {
+  const preferredWeek = options.preferredWeek || null;
+  const preferredSemester = options.preferredSemester || null;
+  const strictWeek = Boolean(options.strictWeek);
+
+  await navigateToModule(
+    page,
+    "#lichhoc",
+    "/modules/thoikhoabieu/html/lichhoc.html",
+    "B46109CD333D4E3DAC50D43E8607ED46"
+  );
+
+  let weekStart, weekEnd;
+  if (preferredWeek) {
+    const parsed = parseDDMMYYYY(preferredWeek);
+    if (parsed) {
+      const range = getWeekRange(parsed);
+      weekStart = range.start;
+      weekEnd = range.end;
+    } else {
+      const range = getWeekRange(new Date());
+      weekStart = range.start;
+      weekEnd = range.end;
+    }
+  } else {
+    const range = getWeekRange(new Date());
+    weekStart = range.start;
+    weekEnd = range.end;
+  }
+
+  const startStr = formatDate(weekStart);
+  const endStr = formatDate(weekEnd);
+
+  const userId = await page.evaluate(() => window.edu?.system?.userId || "");
+  const response = await callSPAApi(
+    page,
+    "SV_ThongTin_MH/DSA4BRINKCIpAiAPKSAv",
+    "pkg_congthongtin_hssv_thongtin.LayDSLichCaNhan",
+    {
+      strQLSV_NguoiHoc_Id: userId,
+      strNgayBatDau: startStr,
+      strNgayKetThuc: endStr,
+    }
+  );
+
+  const allItems = (response && response.Success && response.Data) ? response.Data : [];
+  const scheduleItems = allItems.filter((e) => e && e.PHANLOAI !== "LICHTHI");
+
+  const headers = [
+    "Thu", "Ngay", "Mon hoc", "Phong", "Giang vien",
+    "Tiet bat dau", "So tiet", "Gio hoc", "Ca hoc", "Ma lop", "Hinh thuc hoc",
+  ];
+
+  const rows = scheduleItems.map((item) => {
+    const pad = (n) => String(n || 0).padStart(2, "0");
+    const ngay = item.NGAYHOC || "";
+    const thu = getDayOfWeek(ngay);
+    const tenHP = item.TENHOCPHAN || "Đang cập nhật";
+    const phong = item.PHONGHOC_TEN || item.TENPHONGHOC || "Đang cập nhật";
+    const giangVien = item.TENGIAOVIEN || item.TENGV || item.GIANGVIEN || "Đang cập nhật";
+    const tietBD = item.TIETBATDAU || "-";
+    const tietKT = item.TIETKETTHUC || "-";
+    const soTiet =
+      tietBD !== "-" && tietKT !== "-" ? String(Math.max(Number(tietKT) - Number(tietBD) + 1, 1)) : "-";
+    const gioBD = `${pad(item.GIOBATDAU)}:${pad(item.PHUTBATDAU)}`;
+    const gioKT = `${pad(item.GIOKETTHUC)}:${pad(item.PHUTKETTHUC)}`;
+    const gioHoc = gioBD !== "00:00" || gioKT !== "00:00" ? `${gioBD}-${gioKT}` : "-";
+    const caHoc = item.CAHOC || item.TENCA || "-";
+    const maLop = item.MALOPHOCPHAN || item.TENLOPHOCPHAN || "-";
+    const hinhThuc = item.HINHTHUCHOC || item.LOAILOPHOCPHAN || "-";
+    return [thu, ngay, tenHP, phong, giangVien, String(tietBD), soTiet, gioHoc, caHoc, maLop, hinhThuc];
+  });
+
+  rows.sort((a, b) => {
+    const dateA = parseDDMMYYYY(a[1]) || new Date(0);
+    const dateB = parseDDMMYYYY(b[1]) || new Date(0);
+    if (dateA.getTime() !== dateB.getTime()) return dateA - dateB;
+    return (parseInt(a[5]) || 0) - (parseInt(b[5]) || 0);
+  });
+
+  const weekOptions = [];
+  for (let i = -4; i <= 4; i++) {
+    const wStart = new Date(weekStart);
+    wStart.setDate(wStart.getDate() + i * 7);
+    const wEnd = new Date(wStart);
+    wEnd.setDate(wStart.getDate() + 6);
+    const label = `${formatDate(wStart)} - ${formatDate(wEnd)}`;
+    const value = formatDate(wStart);
+    weekOptions.push({ label, value, selected: i === 0 });
+  }
+
+  const semesterOptions = await page.evaluate(() => {
+    const options = [];
+    const select = document.querySelector("#dropSearch_HocKy, select[id*='HocKy']");
+    if (select) {
+      select.querySelectorAll("option").forEach((opt) => {
+        if (opt.value) {
+          options.push({ label: opt.textContent.trim(), value: opt.value, selected: opt.selected });
+        }
+      });
+    }
+    return options;
+  });
+
+  const result = {
+    scheduleUrl: "https://qldt.eaut.edu.vn/congthongtin/Index.aspx#lichhoc",
+    fetchedAt: new Date().toISOString(),
+    hasData: rows.length > 0,
+    selectedWeekLabel: `${startStr} - ${endStr}`,
+    selectedWeekValue: startStr,
+    weekOptions,
+    semesterOptions,
+    selectedSemesterValue: preferredSemester || null,
+    autoSwitchedWeek: false,
+    originalWeekLabel: `${startStr} - ${endStr}`,
+    studentName,
+    headers,
+    rows,
+  };
+
+  if (!strictWeek && rows.length === 0) {
+    for (let offset of [-7, 7, -14, 14]) {
+      const altStart = new Date(weekStart);
+      altStart.setDate(altStart.getDate() + offset);
+      const altEnd = new Date(altStart);
+      altEnd.setDate(altStart.getDate() + 6);
+
+      const altResponse = await callSPAApi(
+        page,
+        "SV_ThongTin_MH/DSA4BRINKCIpAiAPKSAv",
+        "pkg_congthongtin_hssv_thongtin.LayDSLichCaNhan",
+        {
+          strQLSV_NguoiHoc_Id: userId,
+          strNgayBatDau: formatDate(altStart),
+          strNgayKetThuc: formatDate(altEnd),
+        }
+      );
+
+      const altItems = (altResponse && altResponse.Success && altResponse.Data) ? altResponse.Data : [];
+      const altSchedule = altItems.filter((e) => e && e.PHANLOAI !== "LICHTHI");
+
+      if (altSchedule.length > 0) {
+        const altRows = altSchedule.map((item) => {
+          const pad = (n) => String(n || 0).padStart(2, "0");
+          const ngay = item.NGAYHOC || "";
+          const thu = getDayOfWeek(ngay);
+          const tenHP = item.TENHOCPHAN || "Đang cập nhật";
+          const phong = item.PHONGHOC_TEN || item.TENPHONGHOC || "Đang cập nhật";
+          const giangVien = item.TENGIAOVIEN || item.TENGV || item.GIANGVIEN || "Đang cập nhật";
+          const tietBD = item.TIETBATDAU || "-";
+          const tietKT = item.TIETKETTHUC || "-";
+          const soTiet = tietBD !== "-" && tietKT !== "-" ? String(Math.max(Number(tietKT) - Number(tietBD) + 1, 1)) : "-";
+          const gioBD = `${pad(item.GIOBATDAU)}:${pad(item.PHUTBATDAU)}`;
+          const gioKT = `${pad(item.GIOKETTHUC)}:${pad(item.PHUTKETTHUC)}`;
+          const gioHoc = gioBD !== "00:00" || gioKT !== "00:00" ? `${gioBD}-${gioKT}` : "-";
+          const caHoc = item.CAHOC || item.TENCA || "-";
+          const maLop = item.MALOPHOCPHAN || item.TENLOPHOCPHAN || "-";
+          const hinhThuc = item.HINHTHUCHOC || item.LOAILOPHOCPHAN || "-";
+          return [thu, ngay, tenHP, phong, giangVien, String(tietBD), soTiet, gioHoc, caHoc, maLop, hinhThuc];
+        });
+        altRows.sort((a, b) => {
+          const dateA = parseDDMMYYYY(a[1]) || new Date(0);
+          const dateB = parseDDMMYYYY(b[1]) || new Date(0);
+          if (dateA.getTime() !== dateB.getTime()) return dateA - dateB;
+          return (parseInt(a[5]) || 0) - (parseInt(b[5]) || 0);
+        });
+        result.rows = altRows;
+        result.headers = headers;
+        result.hasData = true;
+        result.autoSwitchedWeek = true;
+        result.selectedWeekLabel = `${formatDate(altStart)} - ${formatDate(altEnd)}`;
+        result.selectedWeekValue = formatDate(altStart);
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
+async function fetchTermScheduleInternal(page, username, studentName, options = {}) {
+  const preferredSemester = options.preferredSemester || "";
+
+  await navigateToModule(
+    page,
+    "#tracuu",
+    "/modules/dangkyhoc/html/tracuu.html",
+    "A9CE858670AE453B90BB0A74458EFA34"
+  );
+
+  // Wait up to 3 seconds for DOM select options to render
+  await page
+    .waitForFunction(
+      () => {
+        const sel = document.querySelector("#dropSearch_HocKy");
+        return sel && sel.querySelectorAll("option").length > 1;
+      },
+      { timeout: 3000 }
+    )
+    .catch(() => {});
+
+  // Extract semester dropdown options directly from DOM
+  const semesterOptions = await page.evaluate(() => {
+    const options = [];
+    const sel = document.querySelector("#dropSearch_HocKy");
+    if (sel) {
+      sel.querySelectorAll("option").forEach((opt) => {
+        if (opt.value && opt.value !== "all") {
+          options.push({ label: opt.textContent.trim(), value: opt.value, selected: opt.selected });
+        }
+      });
+    }
+    return options;
+  });
+
+  // Fetch complete personal schedule API data across the year range
+  const userId = await page.evaluate(() => window.edu?.system?.userId || "");
+  const now = new Date();
+  const semStart = new Date(now.getFullYear() - 1, 0, 1);
+  const semEnd = new Date(now.getFullYear() + 1, 11, 31);
+
+  const apiResponse = await callSPAApi(
+    page,
+    "SV_ThongTin_MH/DSA4BRINKCIpAiAPKSAv",
+    "pkg_congthongtin_hssv_thongtin.LayDSLichCaNhan",
+    {
+      strQLSV_NguoiHoc_Id: userId,
+      strNgayBatDau: formatDate(semStart),
+      strNgayKetThuc: formatDate(semEnd),
+    }
+  );
+
+  const scheduleData = (apiResponse && apiResponse.Success && apiResponse.Data) ? apiResponse.Data : [];
+
+  const cleanString = (str) =>
+    String(str || "")
+      .replace(/<br\s*\/?>/gi, " ")
+      .replace(/&lt;br\s*\/?&gt;/gi, " ")
+      .replace(/<[^>]*>/g, "")
+      .replace(/&lt;[^&]*&gt;/gi, "")
+      .replace(/\s*Có mặt\s*/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  // Map courses by inferred Semester Label from NGAYHOC or DOM option
+  const semMap = new Map();
+  const termHeaders = ["Mã lớp", "Tên học phần", "Hình thức", "Thời gian học", "Phòng", "Học phí"];
+
+  for (const s of scheduleData) {
+    if (!s || s.PHANLOAI === "LICHTHI") continue;
+    const cName = cleanString(s.TENHOCPHAN);
+    if (!cName) continue;
+    const cClass = cleanString(s.MALOPHOCPHAN || s.TENLOPHOCPHAN || cName);
+    const teacher = cleanString(s.TENGIAOVIEN || s.TENGV || s.GIANGVIEN) || "Đang cập nhật";
+    const room = cleanString(s.PHONGHOC_TEN || s.TENPHONGHOC) || "Đang cập nhật";
+    const credits = cleanString(s.SOTINCHI || s.TINCHI) || "3";
+    const hinhThuc = cleanString(s.HINHTHUCHOC || s.LOAILOPHOCPHAN) || "Chính thức";
+    const ngay = s.NGAYHOC || "";
+
+    const semLabel = inferSemesterFromDate(ngay, "Học kỳ hiện tại");
+
+    if (!semMap.has(semLabel)) {
+      semMap.set(semLabel, new Map());
+    }
+    const courseMap = semMap.get(semLabel);
+
+    if (!courseMap.has(cClass.toLowerCase())) {
+      courseMap.set(cClass.toLowerCase(), {
+        id: cClass,
+        name: cName,
+        className: cClass,
+        credits: credits,
+        teacher: teacher,
+        room: room,
+        sched: ngay ? `Lịch học: ${ngay}` : "Theo thời khóa biểu",
+        fee: "0 đ",
+        mode: hinhThuc,
+      });
+    }
+  }
+
+  const mergedResults = [];
+  for (const [semLabel, courseMap] of semMap.entries()) {
+    mergedResults.push({
+      semester: semLabel,
+      headers: termHeaders,
+      rows: Array.from(courseMap.values()),
+    });
+  }
+
+  // Format semester options for UI dropdown
+  let formattedSemesterOptions = semesterOptions.map((s) => ({
+    label: formatSemLabel(s.label),
+    value: s.value,
+    selected: preferredSemester === s.value,
+  }));
+
+  // Failsafe: If DOM select options were empty, fallback to semMap keys!
+  if (formattedSemesterOptions.length === 0) {
+    for (const semLabel of semMap.keys()) {
+      formattedSemesterOptions.push({
+        label: semLabel,
+        value: semLabel,
+        selected: preferredSemester === semLabel,
+      });
+    }
+  }
+
+  const finalOptions = [
+    { label: "-- Xem tất cả học kỳ --", value: "all", selected: !preferredSemester || preferredSemester === "all" },
+    ...formattedSemesterOptions,
+  ];
+
+  return {
+    termUrl: "https://qldt.eaut.edu.vn/congthongtin/Index.aspx#tracuu",
+    fetchedAt: new Date().toISOString(),
+    semesterOptions: finalOptions,
+    results: mergedResults,
+    studentName,
+  };
+}
+
+async function fetchExamScheduleInternal(page, username, studentName, options = {}) {
+  const preferredSemester = options.preferredSemester || "all";
+
+  await navigateToModule(
+    page,
+    "#lichthi",
+    "/modules/thoikhoabieu/html/lichthi.html",
+    "AF6FFE7566A84F058C31083395D4ED4B"
+  );
+
+  const semesterOptions = await page.evaluate(() => {
+    const options = [];
+    const sel = document.querySelector("#dropSearch_HocKy");
+    if (sel) {
+      sel.querySelectorAll("option").forEach((opt) => {
+        if (opt.value) {
+          options.push({ label: opt.textContent.trim(), value: opt.value, selected: opt.selected });
+        }
+      });
+    }
+    return options;
+  });
+
+  let targetSemester = null;
+  if (preferredSemester && preferredSemester !== "all") {
+    targetSemester = semesterOptions.find((s) => s.value === preferredSemester || s.label === preferredSemester);
+  }
+  if (!targetSemester) {
+    targetSemester = semesterOptions.find((s) => s.selected) || semesterOptions[0];
+  }
+
+  const scrapedResultsMap = new Map();
+  if (targetSemester) {
+    await page.evaluate((semVal) => {
+      const sel = document.querySelector("#dropSearch_HocKy");
+      if (sel) {
+        sel.value = semVal;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        if (window.$ && window.$.fn.select2) {
+          try { $(sel).trigger("change"); } catch (e) {}
+        }
+      }
+    }, targetSemester.value);
+    await new Promise((r) => setTimeout(r, 250));
+
+    await page.evaluate(() => {
+      const btn = document.querySelector("#btnXemLich");
+      if (btn) btn.click();
+    });
+    await new Promise((r) => setTimeout(r, 700));
+
+    const rows = await page.evaluate(() => {
+      const table = document.querySelector("#tblLichThiCaNhan");
+      if (!table) return [];
+      const res = [];
+      table.querySelectorAll("tbody tr").forEach((tr) => {
+        const cells = [];
+        tr.querySelectorAll("td").forEach((td) => cells.push(td.textContent.trim()));
+        if (cells.length > 2 && cells.some((c) => c)) res.push(cells);
+      });
+      return res;
+    });
+
+    if (rows && rows.length > 0) {
+      const label = formatSemLabel(targetSemester.label);
+      scrapedResultsMap.set(label, rows);
+    }
+  }
+
+  const userId = await page.evaluate(() => window.edu?.system?.userId || "");
+  const now = new Date();
+  const examStart = new Date(now.getFullYear() - 1, 0, 1);
+  const examEnd = new Date(now.getFullYear() + 1, 11, 31);
+
+  const apiResponse = await callSPAApi(
+    page,
+    "SV_ThongTin_MH/DSA4BRINKCIpAiAPKSAv",
+    "pkg_congthongtin_hssv_thongtin.LayDSLichCaNhan",
+    {
+      strQLSV_NguoiHoc_Id: userId,
+      strNgayBatDau: formatDate(examStart),
+      strNgayKetThuc: formatDate(examEnd),
+    }
+  );
+
+  const allItems = (apiResponse && apiResponse.Success && apiResponse.Data) ? apiResponse.Data : [];
+  const apiExamItems = allItems.filter((e) => e && e.PHANLOAI === "LICHTHI");
+
+  const examHeaders = ["HK", "Môn", "Lần", "Đợt", "Ngày", "Buổi", "Giờ", "Phòng", "SBD", "Hình thức"];
+  const mergedSemestersMap = new Map();
+
+  for (const [semLabel, rows] of scrapedResultsMap.entries()) {
+    for (const cells of rows) {
+      const courseName = cells[2] || cells[1] || "-";
+      const attempt = cells[3] || "1";
+      const date = cells[4] || "-";
+      const time = cells[5] || "-";
+      const format = cells[6] && cells[6] !== "-" ? cells[6] : "Thi kết thúc HP";
+      const room = cells[7] || "-";
+      const sbd = cells[8] || "-";
+
+      const inferredSem = inferSemesterFromDate(date, semLabel);
+      const attemptNum = parseInt(attempt, 10) || 1;
+      const realSemLabel = attemptNum > 1 ? "Khác" : inferredSem;
+
+      if (!mergedSemestersMap.has(realSemLabel)) {
+        mergedSemestersMap.set(realSemLabel, []);
+      }
+      const semRows = mergedSemestersMap.get(realSemLabel);
+
+      const existing = semRows.find((r) => r[1].toLowerCase().trim() === courseName.toLowerCase().trim());
+      if (!existing) {
+        semRows.push([realSemLabel, courseName, attempt, "-", date, "-", time, room, sbd, format]);
+      } else {
+        if ((!existing[8] || existing[8] === "-") && sbd !== "-") existing[8] = sbd;
+        if ((!existing[7] || existing[7] === "-") && room !== "-") existing[7] = room;
+        if ((!existing[9] || existing[9] === "-" || existing[9] === "Thi kết thúc HP") && format !== "-") existing[9] = format;
+      }
+    }
+  }
+
+  if (apiExamItems.length > 0) {
+    for (const item of apiExamItems) {
+      const pad = (n) => String(n || 0).padStart(2, "0");
+      const cName = item.TENHOCPHAN || "-";
+      const date = item.NGAYHOC || "-";
+      const gioBD = `${pad(item.GIOBATDAU)}:${pad(item.PHUTBATDAU)}`;
+      const gioKT = `${pad(item.GIOKETTHUC)}:${pad(item.PHUTKETTHUC)}`;
+      const time = (gioBD !== "00:00" || gioKT !== "00:00") ? `${gioBD} - ${gioKT}` : "-";
+      const room = item.PHONGHOC_TEN || item.TENPHONGHOC || item.PHONGTHI || "-";
+      const sbd = (item.SOBAODANH && item.SOBAODANH !== "0") ? item.SOBAODANH : (item.SBD || "-");
+      const format = item.HINHTHUCTHI || item.DANGKY_LOPHOCPHAN_TEN || item.LOAILOPHOCPHAN || "Thi kết thúc HP";
+
+      const inferredSem = inferSemesterFromDate(date, "Học kỳ hiện tại");
+      const attemptNumApi = parseInt(item.LANTHI, 10) || 1;
+      const realSemLabel = attemptNumApi > 1 ? "Khác" : inferredSem;
+
+      if (!mergedSemestersMap.has(realSemLabel)) {
+        mergedSemestersMap.set(realSemLabel, []);
+      }
+      const semRows = mergedSemestersMap.get(realSemLabel);
+
+      const match = semRows.find((r) => r[1].toLowerCase().trim() === cName.toLowerCase().trim());
+      if (match) {
+        if ((!match[8] || match[8] === "-") && sbd !== "-") match[8] = sbd;
+        if ((!match[7] || match[7] === "-") && room !== "-") match[7] = room;
+        if ((!match[9] || match[9] === "-" || match[9] === "Thi kết thúc HP") && format !== "-") match[9] = format;
+        if ((!match[6] || match[6] === "-") && time !== "-") match[6] = time;
+      } else {
+        semRows.push([realSemLabel, cName, item.LANTHI || "1", "-", date, "-", time, room, sbd, format]);
+      }
+    }
+  }
+
+  let allResults = [];
+  for (const [semester, rows] of mergedSemestersMap.entries()) {
+    allResults.push({
+      semester,
+      headers: examHeaders,
+      rows,
+    });
+  }
+
+  let finalResults = [];
+  if (preferredSemester && preferredSemester !== "all") {
+    const selectedOpt = semesterOptions.find((s) => s.value === preferredSemester);
+    const targetLabel = selectedOpt ? formatSemLabel(selectedOpt.label) : formatSemLabel(preferredSemester);
+
+    finalResults = allResults.filter((r) => r.semester === targetLabel);
+    if (finalResults.length === 0) {
+      finalResults = allResults.filter((r) => r.semester.includes(preferredSemester) || targetLabel.includes(r.semester));
+    }
+  }
+  if (finalResults.length === 0) {
+    finalResults = allResults;
+  }
+
+  const formattedSemesterOptions = semesterOptions.map((s) => ({
+    label: formatSemLabel(s.label),
+    value: s.value,
+    selected: preferredSemester === s.value,
+  }));
+
+  const hasAll = formattedSemesterOptions.some((o) => o.value === "all");
+  const finalOptions = hasAll
+    ? formattedSemesterOptions
+    : [{ label: "-- Tất cả lịch thi các kỳ --", value: "all", selected: !preferredSemester || preferredSemester === "all" }, ...formattedSemesterOptions];
+
+  return {
+    examUrl: "https://qldt.eaut.edu.vn/congthongtin/Index.aspx#lichthi",
+    fetchedAt: new Date().toISOString(),
+    semesterOptions: finalOptions,
+    results: finalResults,
+    selectedSemester: preferredSemester,
+    studentName,
+  };
+}
+
+function filterResultsBySemester(cached, preferredSemester) {
+  if (!cached || !cached.results) return cached;
+
+  if (!preferredSemester || preferredSemester === "all") {
+    const updatedOptions = (cached.semesterOptions || []).map((opt) => ({
+      ...opt,
+      selected: opt.value === "all" || opt.value === preferredSemester,
+    }));
+    return {
+      ...cached,
+      semesterOptions: updatedOptions,
+      results: cached.results,
+      selectedSemester: "all",
+    };
+  }
+
+  const options = cached.semesterOptions || [];
+  const targetOpt = options.find(
+    (opt) =>
+      opt.value === preferredSemester ||
+      opt.label === preferredSemester ||
+      formatSemLabel(opt.label) === formatSemLabel(preferredSemester)
+  );
+
+  let filtered = [];
+  const labelLower = targetOpt ? targetOpt.label.toLowerCase().trim() : "";
+
+  if (labelLower) {
+    filtered = cached.results.filter(
+      (r) =>
+        r.semester.toLowerCase().trim() === labelLower ||
+        r.semester.toLowerCase().includes(labelLower) ||
+        labelLower.includes(r.semester.toLowerCase())
+    );
+  }
+
+  if (filtered.length === 0) {
+    const m = preferredSemester.match(/(\d{4})[\_\-\s]+(\d{4})[\_\-\s]+(\d+)/);
+    if (m) {
+      const yearStart = m[1];
+      const yearEnd = m[2];
+      const hkNum = m[3];
+
+      filtered = cached.results.filter((r) => {
+        const sem = r.semester || "";
+        const hasYear = sem.includes(yearStart) || sem.includes(yearEnd);
+        const hasHK = sem.includes(`HK${hkNum}`) || sem.includes(`Học kỳ ${hkNum}`);
+        return hasYear && hasHK;
+      });
+    }
+  }
+
+  if (filtered.length === 0) {
+    filtered = cached.results.filter(
+      (r) =>
+        r.semester.includes(preferredSemester) ||
+        preferredSemester.includes(r.semester)
+    );
+  }
+
+  const updatedSemesterOptions = options.map((opt) => ({
+    ...opt,
+    selected:
+      opt.value === preferredSemester ||
+      (targetOpt && opt.value === targetOpt.value),
+  }));
+
+  return {
+    ...cached,
+    semesterOptions: updatedSemesterOptions,
+    results: filtered,
+    selectedSemester: targetOpt ? targetOpt.value : preferredSemester,
+  };
+}
+
+// ─── PUBLIC PREFETCH & SCHEDULE EXPORTS ───────────────────────────────
+
+async function prefetchAllStudentData(username, password, options = {}) {
+  const preferredWeek = options.preferredWeek || null;
+  const preferredSemester = options.preferredSemester || null;
+  const strictWeek = Boolean(options.strictWeek);
+
+  const weeklyKey = cacheKey(username, "weekly", { preferredWeek, preferredSemester, strictWeek });
+  if (options.useCache !== false) {
+    const cachedWeekly = getFromCache(weeklyKey);
+    if (cachedWeekly) return cachedWeekly;
+  }
+
+  return enqueueTask(async () => {
+    let browserContext, page, studentName;
+    try {
+      console.log(`[PREFETCH BATCH] Logging in once in isolated context for ${username}...`);
+      ({ browserContext, page, studentName } = await createAuthenticatedPage(username, password));
+
+      // 1. Fetch Weekly Schedule
+      const weeklyResult = await fetchWeeklyScheduleInternal(page, username, studentName, options);
+      setCache(weeklyKey, weeklyResult);
+
+      // 2. Fetch & Cache Term Schedule
+      try {
+        const termResult = await fetchTermScheduleInternal(page, username, studentName, { fetchAll: true });
+        setCache(cacheKey(username, "term", { fetchAll: false, preferredSemester: "" }), termResult);
+        setCache(cacheKey(username, "term", { fetchAll: true, preferredSemester: "" }), termResult);
+        setCache(cacheKey(username, "term", { fetchAll: false, preferredSemester: "all" }), termResult);
+        setCache(cacheKey(username, "term", { fetchAll: true, preferredSemester: "all" }), termResult);
+        console.log(`[PREFETCH BATCH] Term schedule cached successfully for ${username}`);
+      } catch (err) {
+        console.error("[PREFETCH TERM ERROR]", err.message);
+      }
+
+      // 3. Fetch & Cache Exam Schedule
+      try {
+        const examResult = await fetchExamScheduleInternal(page, username, studentName, { fetchAll: true, preferredSemester: "all" });
+        setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "all" }), examResult);
+        setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "all" }), examResult);
+        setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "" }), examResult);
+        console.log(`[PREFETCH BATCH] Exam schedule cached successfully for ${username}`);
+      } catch (err) {
+        console.error("[PREFETCH EXAM ERROR]", err.message);
+      }
+
+      return weeklyResult;
+    } finally {
+      if (page) await page.close().catch(() => {});
+      if (browserContext) await browserContext.close().catch(() => {});
+    }
+  });
 }
 
 async function getStudentSchedule(username, password, options = {}) {
@@ -717,380 +1014,69 @@ async function getStudentSchedule(username, password, options = {}) {
     if (cached) return cached;
   }
 
-  const jar = new CookieJar();
-  const client = wrapper(
-    axios.create({
-      jar,
-      withCredentials: true,
-      maxRedirects: 5,
-      timeout: 30000,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36",
-      },
-    })
-  );
-
-  const { $afterLogin, studentName } = await performLogin(client, username, password);
-
-  let scheduleUrl = findScheduleUrl($afterLogin) || new URL("/wfrmLichHocSinhVienTinChi.aspx", BASE_URL).toString();
-  let scheduleResponse = await client.get(scheduleUrl);
-  let $schedule = cheerio.load(scheduleResponse.data);
-
-  // 1. Handle Semester Selection
-  const semesters = extractSemesterOptions($schedule);
-  let selectedSemesterObj = null;
-  if (semesters.length > 0) {
-    if (preferredSemester) {
-       selectedSemesterObj = semesters.find(s => s.value === preferredSemester);
-    }
-    if (!selectedSemesterObj) {
-       selectedSemesterObj = semesters[semesters.length - 1];
-    }
-    
-    if (!selectedSemesterObj.selected) {
-      const hidden = extractHiddenFields($schedule);
-      const semPayload = {
-        ...hidden,
-        __EVENTTARGET: $("#drpHocKy").length ? "drpHocKy" : "cmbHocKy",
-        __EVENTARGUMENT: "",
-        [$("#drpHocKy").length ? "drpHocKy" : "cmbHocKy"]: selectedSemesterObj.value,
-      };
-      scheduleResponse = await client.post(
-        scheduleUrl,
-        new URLSearchParams(semPayload).toString(),
-        { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-      );
-      $schedule = cheerio.load(scheduleResponse.data);
-      // Update week options since semester changed
-      semesters.forEach(s => s.selected = s.value === selectedSemesterObj.value);
-    }
-  }
-
-  let schedule = extractTableData($schedule);
-  let weekMeta = extractWeekMeta($schedule);
-  let resolvedFromAnotherWeek = false;
-  let originalWeekLabel = weekMeta.selected?.label || null;
-
-  // 2. Handle Week Selection
-  if (preferredWeek && weekMeta.options.some((item) => item.value === preferredWeek)) {
-    const hidden = extractHiddenFields($schedule);
-    const weekPayload = {
-      ...hidden,
-      __EVENTTARGET: "cmbTuan_thu",
-      __EVENTARGUMENT: "",
-      cmbTuan_thu: preferredWeek,
-    };
-    const weekResponse = await client.post(
-      scheduleUrl,
-      new URLSearchParams(weekPayload).toString(),
-      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-    );
-    $schedule = cheerio.load(weekResponse.data);
-    schedule = extractTableData($schedule);
-    weekMeta = extractWeekMeta($schedule);
-  }
-
-  // 3. Fallback to nearby weeks if current week is empty
-  if (!strictWeek && !schedule.rows.length && weekMeta.options.length > 1 && weekMeta.selected) {
-    const currentIndex = weekMeta.options.findIndex((item) => item.value === weekMeta.selected.value);
-    const orderedIndexes = [];
-    for (let i = currentIndex - 1; i >= 0; i -= 1) orderedIndexes.push(i);
-    for (let i = currentIndex + 1; i < weekMeta.options.length; i += 1) orderedIndexes.push(i);
-
-    for (const index of orderedIndexes) {
-      const candidate = weekMeta.options[index];
-      const hidden = extractHiddenFields($schedule);
-      const payload = {
-        ...hidden,
-        __EVENTTARGET: "cmbTuan_thu",
-        __EVENTARGUMENT: "",
-        cmbTuan_thu: candidate.value,
-      };
-      try {
-        const changedWeekResponse = await client.post(
-          scheduleUrl,
-          new URLSearchParams(payload).toString(),
-          { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-        );
-        const $changedWeek = cheerio.load(changedWeekResponse.data);
-        const candidateSchedule = extractTableData($changedWeek);
-        if (candidateSchedule.rows.length > 0) {
-          schedule = candidateSchedule;
-          weekMeta = extractWeekMeta($changedWeek);
-          resolvedFromAnotherWeek = true;
-          break;
-        }
-      } catch (_e) {}
-    }
-  }
-
-  const result = {
-    scheduleUrl,
-    fetchedAt: new Date().toISOString(),
-    hasData: schedule.rows.length > 0,
-    selectedWeekLabel: weekMeta.selected?.label || null,
-    selectedWeekValue: weekMeta.selected?.value || null,
-    weekOptions: weekMeta.options.map((item) => ({
-      label: item.label,
-      value: item.value,
-      selected: item.selected,
-    })),
-    semesterOptions: semesters.map((item) => ({
-      label: item.label,
-      value: item.value,
-      selected: item.selected,
-    })),
-    selectedSemesterValue: selectedSemesterObj?.value || null,
-    autoSwitchedWeek: resolvedFromAnotherWeek,
-    originalWeekLabel,
-    studentName,
-    ...schedule,
-  };
-  setCache(key, result);
-  return result;
+  return prefetchAllStudentData(username, password, options);
 }
 
 async function getStudentTermSchedule(username, password, options = {}) {
   const fetchAll = Boolean(options.fetchAll);
-  const key = cacheKey(username, "term", { fetchAll });
+  const preferredSemester = options.preferredSemester || "";
+
+  const specificKey = cacheKey(username, "term", { fetchAll, preferredSemester });
+  const generalKey = cacheKey(username, "term", { fetchAll: true, preferredSemester: "" });
+  const allKey = cacheKey(username, "term", { fetchAll: true, preferredSemester: "all" });
+
   if (options.useCache !== false) {
-    const cached = getFromCache(key);
-    if (cached) return cached;
+    const cached = getFromCache(specificKey) || getFromCache(generalKey) || getFromCache(allKey);
+    if (cached) {
+      return filterResultsBySemester(cached, preferredSemester);
+    }
   }
 
-  const jar = new CookieJar();
-  const client = wrapper(
-    axios.create({
-      jar,
-      withCredentials: true,
-      maxRedirects: 5,
-      timeout: 30000,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36",
-      },
-    })
-  );
-
-  const { studentName } = await performLogin(client, username, password);
-
-  // 2. Initial Fetch
-  const termUrl = new URL("/wfrmDangKyLopTinChiB3.aspx", BASE_URL).toString();
-  let termPage = await client.get(termUrl);
-  let $term = cheerio.load(termPage.data);
-
-  const semesterOptions = extractSemesterOptions($term);
-  let results = [];
-
-  if (fetchAll && semesterOptions.length > 0) {
-    let currentHidden = extractHiddenFields($term);
-    for (const sem of semesterOptions) {
-      try {
-        const fieldName = sem.fieldName || "drpHocKy";
-        const payload = {
-          ...currentHidden,
-          __EVENTTARGET: fieldName,
-          __EVENTARGUMENT: "",
-          [fieldName]: sem.value,
-        };
-        const resp = await client.post(termUrl, new URLSearchParams(payload).toString(), {
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        });
-        const $sem = cheerio.load(resp.data);
-        currentHidden = extractHiddenFields($sem);
-        
-        const schedule = extractTermScheduleFromGrid($sem);
-        if (schedule.rows.length > 0) {
-          results.push({
-            semester: sem.label,
-            ...schedule
-          });
-        }
-      } catch (_e) {
-        console.error("Lỗi khi tải học kỳ:", sem.label);
-      }
+  return enqueueTask(async () => {
+    let browserContext, page, studentName;
+    try {
+      ({ browserContext, page, studentName } = await createAuthenticatedPage(username, password));
+      const result = await fetchTermScheduleInternal(page, username, studentName, options);
+      setCache(specificKey, result);
+      return filterResultsBySemester(result, preferredSemester);
+    } finally {
+      if (page) await page.close().catch(() => {});
+      if (browserContext) await browserContext.close().catch(() => {});
     }
-  } else {
-    const targetSem = options.preferredSemester || (semesterOptions.find(o => o.selected) || semesterOptions[semesterOptions.length - 1]);
-    const targetVal = typeof targetSem === "string" ? targetSem : targetSem?.value;
-    const targetLabel = typeof targetSem === "string" ? (semesterOptions.find(o => o.value === targetSem)?.label || "Học kỳ") : (targetSem?.label || "Học kỳ hiện tại");
-    
-    if (targetVal) {
-        const fieldName = semesterOptions.find(o => o.value === targetVal)?.fieldName || "drpHocKy";
-        const hidden = extractHiddenFields($term);
-        const payload = {
-          ...hidden,
-          __EVENTTARGET: fieldName,
-          __EVENTARGUMENT: "",
-          [fieldName]: targetVal,
-        };
-        const resp = await client.post(termUrl, new URLSearchParams(payload).toString(), {
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        });
-        $term = cheerio.load(resp.data);
-    }
-    const schedule = extractTermScheduleFromGrid($term);
-    results.push({
-      semester: targetLabel,
-      ...schedule
-    });
-  }
-
-  const result = {
-    termUrl,
-    fetchedAt: new Date().toISOString(),
-    semesterOptions,
-    results, 
-    studentName
-  };
-  return result;
+  });
 }
 
 async function getStudentExamSchedule(username, password, options = {}) {
-  const fetchAllExams = options.preferredSemester === "all" || options.fetchAll;
-  const key = cacheKey(username, "exam", { fetchAll: fetchAllExams, preferredSemester: options.preferredSemester });
+  const preferredSemester = options.preferredSemester || "all";
+  const fetchAllExams = preferredSemester === "all" || Boolean(options.fetchAll);
+
+  const specificKey = cacheKey(username, "exam", { fetchAll: fetchAllExams, preferredSemester });
+  const generalKey = cacheKey(username, "exam", { fetchAll: true, preferredSemester: "all" });
+
   if (options.useCache !== false) {
-    const cached = getFromCache(key);
-    if (cached) return cached;
+    const cached = getFromCache(specificKey) || getFromCache(generalKey);
+    if (cached) {
+      return filterResultsBySemester(cached, preferredSemester);
+    }
   }
 
-  const jar = new CookieJar();
-  const client = wrapper(
-    axios.create({
-      jar,
-      withCredentials: true,
-      maxRedirects: 5,
-      timeout: 30000,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36",
-      },
-    })
-  );
-
-  const { studentName } = await performLogin(client, username, password);
-
-  const examUrl = new URL("/ThongTinLichThi.aspx", BASE_URL).toString();
-  let examPage = await client.get(examUrl);
-  let $exam = cheerio.load(examPage.data);
-
-  let semesterOptions = extractSemesterOptions($exam);
-  
-  // If exam page doesn't have semesters, try the term schedule page
-  if (semesterOptions.length === 0) {
+  return enqueueTask(async () => {
+    let browserContext, page, studentName;
     try {
-      const termUrl = new URL("/wfrmDangKyLopTinChiB3.aspx", BASE_URL).toString();
-      const termPage = await client.get(termUrl);
-      const $term = cheerio.load(termPage.data);
-      semesterOptions = extractSemesterOptions($term);
-    } catch (_e) {}
-  }
-
-  let results = [];
-  const initialSchedule = extractExamScheduleFromGrid($exam);
-
-  const hasSemesterDropdown = $exam('select').filter((_i, el) => {
-    const text = normalizeText($(el).text());
-    return text.includes("hoc ky") || text.includes("nam hoc");
-  }).length > 0;
-
-  if (fetchAllExams) {
-    if (hasSemesterDropdown && semesterOptions.length > 0) {
-      let currentHidden = extractHiddenFields($exam);
-      // Fetch sequentially to respect UniSoft session state
-      for (const sem of semesterOptions) {
-        try {
-          const fieldName = sem.fieldName || "drpHocKy";
-          const payload = { ...currentHidden, __EVENTTARGET: fieldName, __EVENTARGUMENT: "", [fieldName]: sem.value };
-          const resp = await client.post(examUrl, new URLSearchParams(payload).toString(), {
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          });
-          const $sem = cheerio.load(resp.data);
-          // Update hidden fields for the next request in sequence
-          currentHidden = extractHiddenFields($sem);
-          
-          const schedule = extractExamScheduleFromGrid($sem);
-          if (schedule.rows.length > 0) {
-             results.push({ semester: sem.label, ...schedule });
-          }
-        } catch (_e) {
-          console.error(`Error fetching exam for ${sem.label}:`, _e.message);
-        }
-      }
-    } 
-    
-    // Fallback or Grouping for single-page "All Semesters" view
-    if (results.length === 0 && initialSchedule.rows.length > 0) {
-      // Group rows by the HK column
-      const groups = {};
-      initialSchedule.rows.forEach(row => {
-        const hk = row[0] || "Khác";
-        if (!groups[hk]) groups[hk] = [];
-        groups[hk].push(row);
-      });
-      results = Object.keys(groups).map(hk => ({
-        semester: hk,
-        headers: initialSchedule.headers,
-        rows: groups[hk]
-      }));
+      ({ browserContext, page, studentName } = await createAuthenticatedPage(username, password));
+      const result = await fetchExamScheduleInternal(page, username, studentName, options);
+      setCache(specificKey, result);
+      return filterResultsBySemester(result, preferredSemester);
+    } finally {
+      if (page) await page.close().catch(() => {});
+      if (browserContext) await browserContext.close().catch(() => {});
     }
-  } else {
-    const targetSem = options.preferredSemester || (semesterOptions.find(o => o.selected) || semesterOptions[semesterOptions.length - 1]);
-    const targetVal = typeof targetSem === "string" ? targetSem : targetSem?.value;
-    const targetLabel = typeof targetSem === "string" ? (semesterOptions.find(o => o.value === targetSem)?.label || "Học kỳ") : (targetSem?.label || "Học kỳ hiện tại");
-    
-    let finalSchedule = initialSchedule;
-
-    if (targetVal && hasSemesterDropdown) {
-        const fieldName = semesterOptions.find(o => o.value === targetVal)?.fieldName || "drpHocKy";
-        const hidden = extractHiddenFields($exam);
-        const payload = { ...hidden, __EVENTTARGET: fieldName, __EVENTARGUMENT: "", [fieldName]: targetVal };
-        try {
-          const resp = await client.post(examUrl, new URLSearchParams(payload).toString(), {
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          });
-          finalSchedule = extractExamScheduleFromGrid(cheerio.load(resp.data));
-        } catch (_e) {}
-    }
-    
-    // Filter rows if we have a target semester and the data might be mixed
-    if (targetVal && targetVal !== "all" && finalSchedule.rows.length > 0) {
-       const normLabel = normalizeText(targetLabel);
-       const filteredRows = finalSchedule.rows.filter(row => {
-          const rowHk = normalizeText(row[0]);
-          const labelNums = normLabel.match(/\d+/g) || [];
-          const rowNums = rowHk.match(/\d+/g) || [];
-          if (labelNums.length >= 2 && rowNums.length >= 2) {
-             return labelNums.every(n => rowHk.includes(n)) || rowNums.every(n => normLabel.includes(n));
-          }
-          return rowHk.includes(normLabel) || normLabel.includes(rowHk);
-       });
-       if (filteredRows.length > 0) {
-         finalSchedule.rows = filteredRows;
-       }
-    }
-
-    results.push({
-      semester: targetLabel,
-      ...finalSchedule
-    });
-  }
-
-  const result = {
-    examUrl,
-    fetchedAt: new Date().toISOString(),
-    semesterOptions,
-    results, 
-    selectedSemester: options.preferredSemester || "all",
-    studentName
-  };
-  setCache(key, result);
-  return result;
+  });
 }
 
 module.exports = {
   getStudentSchedule,
   getStudentTermSchedule,
   getStudentExamSchedule,
+  prefetchAllStudentData,
 };

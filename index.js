@@ -2,7 +2,7 @@ const path = require("path");
 const express = require("express");
 const cookieSession = require("cookie-session");
 const dotenv = require("dotenv");
-const { getStudentSchedule, getStudentTermSchedule, getStudentExamSchedule } = require("./services/eautClient");
+const { getStudentSchedule, getStudentTermSchedule, getStudentExamSchedule, prefetchAllStudentData } = require("./services/eautClient");
 
 dotenv.config();
 
@@ -23,15 +23,20 @@ app.use(
   })
 );
 
-app.get("/favicon.ico", (req, res) => res.sendFile(path.join(__dirname, "public", "favicon.png")));
-app.get("/favicon.png", (req, res) => res.sendFile(path.join(__dirname, "public", "favicon.png")));
+app.get("/favicon.ico", (req, res) => res.sendFile(path.join(__dirname, "public", "favicon.svg")));
+app.get("/favicon.png", (req, res) => res.sendFile(path.join(__dirname, "public", "favicon.svg")));
 
 
-// Disable caching for all routes to ensure fresh data
+// Enable caching for static assets while keeping schedule pages fresh
 app.use((req, res, next) => {
-  res.header("Cache-Control", "no-cache, no-store, must-revalidate");
-  res.header("Pragma", "no-cache");
-  res.header("Expires", "0");
+  const isStatic = req.path.startsWith("/styles.css") || req.path.startsWith("/app.js") || req.path.startsWith("/favicon") || req.path.endsWith(".png") || req.path.endsWith(".css") || req.path.endsWith(".js");
+  if (isStatic) {
+    res.header("Cache-Control", "public, max-age=86400");
+  } else {
+    res.header("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.header("Pragma", "no-cache");
+    res.header("Expires", "0");
+  }
   next();
 });
 
@@ -65,9 +70,10 @@ app.post("/schedule", async (req, res) => {
   }
 
   try {
-    const result = await getStudentSchedule(formData.username, formData.password, {
+    const result = await prefetchAllStudentData(formData.username, formData.password, {
       preferredWeek: req.body.week || null,
       strictWeek: false,
+      useCache: false, // Force fresh crawl per account on login!
     });
 
     req.session.studentLogin = {
@@ -79,8 +85,10 @@ app.post("/schedule", async (req, res) => {
     return res.redirect("/schedule/week");
   } catch (error) {
     console.error("SCHEDULE POST ERROR:", error);
-    return res.status(500).render("index", {
-      error: error.message || "Khong the lay lich hoc tu he thong EAUT.",
+    const isLoginError = error.message && (error.message.includes("Đăng nhập thất bại") || error.message.includes("Vui lòng nhập"));
+    const statusCode = isLoginError ? 400 : 500;
+    return res.status(statusCode).render("index", {
+      error: error.message || "Không thể lấy lịch học từ hệ thống EAUT.",
       result: null,
       formData: { username: formData.username, password: formData.password },
     });

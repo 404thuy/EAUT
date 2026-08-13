@@ -1,0 +1,1197 @@
+<!DOCTYPE html><html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Education management</title>
+    <link rel="stylesheet" href="assets/css/styles.css?v=72633b77-eaac-4787-8e5b-335f1d960222">
+    <link href="assets/select2/css/select2.min.css" rel="stylesheet">
+    <link href="assets/pagination/simplePagination.min.css" rel="stylesheet">
+    <link rel="shortcut icon" type="image/x-icon" href="assets/images/logo.ico">
+    <style>
+        /* ===== Notification dropdown - inline to guarantee load ===== */
+        #fcm-noti-button{position:relative;background:transparent;border:0;padding:0;width:38px;height:38px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#5b6b8c;transition:background-color .2s ease,color .2s ease}
+        #fcm-noti-button:hover,#fcm-noti-button[aria-expanded="true"]{background:rgba(31,95,178,.1);color:#1f5fb2}
+        #fcm-noti-button .fa-bell{font-size:18px;line-height:1}
+        #fcm-noti-button[aria-expanded="true"] .fa-bell{animation:fcm-bell-shake .5s ease;transform-origin:top center}
+        @keyframes fcm-bell-shake{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(5deg)}}
+        #fcm-noti-badge{font-size:10px!important;height:18px!important;min-width:18px!important;padding:0 5px!important;display:inline-flex;align-items:center;justify-content:center;font-weight:600;border:2px solid #fff;line-height:1;top:4px!important;left:auto!important;right:4px!important;transform:none!important}
+        #fcm-noti-badge[style*="display: none"],#fcm-noti-badge[style*="display:none"]{display:none!important}
+
+        .navbar #fcm-noti-menu.dropdown-menu,
+        #fcm-noti-menu.dropdown-menu{
+            width:380px!important;min-width:380px!important;max-width:92vw!important;
+            padding:0!important;margin-top:12px!important;margin:12px 0 0 0!important;
+            border:0!important;border-radius:14px!important;background:#fff!important;
+            box-shadow:0 18px 48px rgba(15,30,70,.18),0 4px 12px rgba(15,30,70,.08)!important;
+            overflow:hidden!important;list-style:none!important;
+            top:100%!important;right:0!important;left:auto!important
+        }
+        #fcm-noti-menu.dropdown-menu.show{animation:fcm-noti-pop .18s ease-out}
+        @keyframes fcm-noti-pop{from{opacity:0;transform:translateY(-8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+        #fcm-noti-menu.dropdown-menu::before{content:'';position:absolute;top:-6px;right:16px;width:12px;height:12px;background:#1f5fb2;transform:rotate(45deg);border-radius:2px;z-index:1}
+
+        #fcm-noti-menu .fcm-noti-header{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;padding:14px 18px!important;background:linear-gradient(135deg,#1f5fb2 0%,#2b7bd9 100%)!important;color:#fff!important;list-style:none!important;margin:0!important;border-radius:14px 14px 0 0}
+        #fcm-noti-menu .fcm-noti-header h6{font-size:15px!important;font-weight:600!important;margin:0!important;color:#fff!important;display:inline-flex!important;align-items:center!important;gap:8px!important}
+        #fcm-noti-menu .fcm-noti-header h6 i{font-size:16px;color:#fff!important}
+        #fcm-noti-menu .fcm-noti-header h6 .fcm-noti-count{background:rgba(255,255,255,.22);color:#fff!important;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;min-width:22px;text-align:center}
+        #fcm-noti-menu .fcm-noti-mark-read{font-size:12px!important;color:rgba(255,255,255,.95)!important;cursor:pointer;background:rgba(255,255,255,.15)!important;border:0!important;padding:5px 10px!important;border-radius:6px!important;transition:background-color .15s ease;white-space:nowrap;line-height:1}
+        #fcm-noti-menu .fcm-noti-mark-read:hover{background:rgba(255,255,255,.28)!important;color:#fff!important}
+        #fcm-noti-menu .fcm-noti-mark-read i{margin-right:4px;font-size:11px;color:#fff!important}
+
+        #fcm-noti-menu .fcm-noti-list-wrap{list-style:none!important;margin:0!important;padding:0!important;background:#fff}
+        #fcm-noti-menu .fcm-noti-list{list-style:none!important;margin:0!important;padding:0!important;max-height:60vh;overflow-y:auto}
+        #fcm-noti-menu .fcm-noti-list::-webkit-scrollbar{width:6px}
+        #fcm-noti-menu .fcm-noti-list::-webkit-scrollbar-thumb{background:#d6dce9;border-radius:3px}
+        #fcm-noti-menu .fcm-noti-list::-webkit-scrollbar-thumb:hover{background:#a9b3cb}
+
+        #fcm-noti-menu .fcm-noti-item{display:flex!important;gap:12px!important;padding:12px 16px!important;cursor:pointer;border-bottom:1px solid #f0f2f7;transition:background-color .15s ease;list-style:none!important;margin:0!important}
+        #fcm-noti-menu .fcm-noti-item:last-child{border-bottom:0}
+        #fcm-noti-menu .fcm-noti-item:hover{background:#f4f8ff}
+        #fcm-noti-menu .fcm-noti-icon{flex:0 0 38px!important;width:38px!important;height:38px!important;border-radius:50%!important;background:linear-gradient(135deg,#e7efff 0%,#cfe1ff 100%)!important;color:#1f5fb2!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:16px!important}
+        #fcm-noti-menu .fcm-noti-icon i{color:#1f5fb2!important}
+        #fcm-noti-menu .fcm-noti-content{flex:1!important;min-width:0!important}
+        #fcm-noti-menu .fcm-noti-title{font-size:14px!important;font-weight:600!important;color:#1f2a44!important;margin:0 0 2px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3!important}
+        #fcm-noti-menu .fcm-noti-text{font-size:13px!important;color:#5b6b8c!important;margin:0 0 4px!important;line-height:1.4!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+        #fcm-noti-menu .fcm-noti-time{font-size:11px!important;color:#8a96b3!important;display:inline-flex!important;align-items:center;gap:4px}
+        #fcm-noti-menu .fcm-noti-time i{font-size:10px;color:#8a96b3!important}
+
+        #fcm-noti-menu .fcm-noti-empty{list-style:none!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;padding:44px 20px!important;color:#8a96b3!important;text-align:center!important;margin:0!important}
+        #fcm-noti-menu .fcm-noti-empty .fcm-noti-empty-icon{width:64px!important;height:64px!important;border-radius:50%!important;background:#f3f5fb!important;color:#b8c2d9!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:26px!important;margin-bottom:12px!important}
+        #fcm-noti-menu .fcm-noti-empty .fcm-noti-empty-icon i{color:#b8c2d9!important}
+        #fcm-noti-menu .fcm-noti-empty p{font-size:13px!important;margin:0!important;color:#6b7693!important;font-weight:500}
+        #fcm-noti-menu .fcm-noti-empty span{font-size:12px!important;color:#a3acc4!important;margin-top:4px!important}
+
+        @media (max-width:576px){
+            .navbar #fcm-noti-menu.dropdown-menu,
+            #fcm-noti-menu.dropdown-menu{position:fixed!important;top:60px!important;left:8px!important;right:8px!important;bottom:auto!important;width:auto!important;min-width:0!important;max-width:none!important;margin:0!important;transform:none!important;inset:60px 8px auto 8px!important}
+            #fcm-noti-menu.dropdown-menu::before{right:56px}
+            #fcm-noti-menu .fcm-noti-list{max-height:70vh}
+            #fcm-noti-menu .fcm-noti-header{padding:12px 14px!important}
+            #fcm-noti-menu .fcm-noti-item{padding:12px 14px!important}
+        }
+
+        /* ===== Search-as-navigation suggest dropdown ===== */
+        .search-group{ position: relative; }
+        .search-suggest{
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0; right: 0;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 18px 48px rgba(15,30,70,.18), 0 4px 12px rgba(15,30,70,.08);
+            max-height: 60vh;
+            overflow-y: auto;
+            z-index: 10000;
+            padding: 6px 0;
+            display: none;
+        }
+        .search-suggest.show{ display: block; animation: search-pop .15s ease-out; }
+        @keyframes search-pop{ from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+        .search-suggest-empty{ padding: 22px 16px; text-align: center; color: #8a96b3; font-size: 13px; }
+        .search-suggest-item{
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 14px; cursor: pointer;
+            color: #1f2a44; font-size: 13px;
+            transition: background-color .12s ease, transform .12s ease;
+            position: relative;
+        }
+        .search-suggest-item::before{
+            content: ''; position: absolute; left: 0; top: 8px; bottom: 8px;
+            width: 3px; border-radius: 0 3px 3px 0;
+            background: var(--ss-accent, #1f5fb2); opacity: 0;
+            transition: opacity .15s ease;
+        }
+        .search-suggest-item:hover,
+        .search-suggest-item.active{ background: #f4f8ff; }
+        .search-suggest-item.active::before{ opacity: 1; }
+        .search-suggest-item.active .ss-icon{
+            box-shadow: 0 6px 14px rgba(15,30,70,.18), 0 0 0 3px rgba(255,255,255,.95) inset;
+            transform: scale(1.04);
+        }
+        .search-suggest-item .ss-icon{
+            flex: 0 0 36px; width: 36px; height: 36px;
+            border-radius: 11px;
+            background: var(--ss-grad, linear-gradient(135deg,#1f5fb2 0%,#4f8be0 100%));
+            color: #fff;
+            display: inline-flex;
+            align-items: center; justify-content: center;
+            font-size: 15px; line-height: 1;
+            box-shadow: 0 4px 10px rgba(15,30,70,.14), inset 0 1px 0 rgba(255,255,255,.25);
+            transition: transform .15s ease, box-shadow .15s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .search-suggest-item .ss-icon::after{
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(180deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 55%);
+            pointer-events: none;
+        }
+        .search-suggest-item .ss-icon i,
+        .search-suggest-item .ss-icon i.item-icon{
+            position: relative; z-index: 1;
+            width: auto!important;
+            margin: 0!important;
+            padding: 0!important;
+            font-size: 16px!important;
+            line-height: 1!important;
+            text-align: center!important;
+            display: inline-block;
+            color: #fff!important;
+            filter: drop-shadow(0 1px 1px rgba(0,0,0,.18));
+        }
+        .search-suggest-item .ss-icon i.item-icon::before,
+        .search-suggest-item .ss-icon i::before{
+            color: #fff!important;
+        }
+        .search-suggest-item:hover .ss-icon{ transform: scale(1.04); }
+        .search-suggest-item .ss-text{
+            flex: 1; min-width: 0;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            font-weight: 500;
+        }
+        .search-suggest-item .ss-parent{
+            font-size: 11px; color: #8a96b3; margin-left: 6px;
+            font-weight: 400;
+        }
+        .search-suggest-item .ss-arrow{
+            flex: 0 0 auto; color: #c2cae0; font-size: 12px;
+            opacity: 0; transform: translateX(-4px);
+            transition: opacity .15s ease, transform .15s ease;
+        }
+        .search-suggest-item.active .ss-arrow,
+        .search-suggest-item:hover .ss-arrow{
+            opacity: 1; transform: translateX(0); color: var(--ss-accent, #1f5fb2);
+        }
+        .search-suggest-item mark{
+            background: #fff3a8; color: inherit; padding: 0 1px; border-radius: 2px;
+        }
+
+        /* Color palette — rotate per parent menu group */
+        .ss-c0{ --ss-accent:#1f5fb2; --ss-grad: linear-gradient(135deg,#1f5fb2 0%,#4f8be0 100%); }
+        .ss-c1{ --ss-accent:#0e9f6e; --ss-grad: linear-gradient(135deg,#0e9f6e 0%,#34d399 100%); }
+        .ss-c2{ --ss-accent:#e85d04; --ss-grad: linear-gradient(135deg,#e85d04 0%,#fb923c 100%); }
+        .ss-c3{ --ss-accent:#9333ea; --ss-grad: linear-gradient(135deg,#9333ea 0%,#c084fc 100%); }
+        .ss-c4{ --ss-accent:#db2777; --ss-grad: linear-gradient(135deg,#db2777 0%,#f472b6 100%); }
+        .ss-c5{ --ss-accent:#0891b2; --ss-grad: linear-gradient(135deg,#0891b2 0%,#22d3ee 100%); }
+        .ss-c6{ --ss-accent:#ca8a04; --ss-grad: linear-gradient(135deg,#ca8a04 0%,#fbbf24 100%); }
+        .ss-c7{ --ss-accent:#475569; --ss-grad: linear-gradient(135deg,#475569 0%,#94a3b8 100%); }
+        .search-suggest::-webkit-scrollbar{ width: 6px; }
+        .search-suggest::-webkit-scrollbar-thumb{ background: #d6dce9; border-radius: 3px; }
+        @media (max-width: 768px){
+            .search-suggest{
+                position: fixed!important;
+                top: 96px; left: 8px; right: 8px;
+                max-height: calc(100vh - 110px);
+            }
+        }
+
+        /* ===== Mobile header (top bar) responsive fix ===== */
+        @media (max-width: 768px){
+            /* Promote navbar to a real fixed top bar */
+            .content-page > .navbar{
+                position: fixed!important;
+                top: 0; left: 0; right: 0;
+                width: 100%!important;
+                height: 56px!important;
+                background-color: #061b5b;
+                z-index: 9990;
+                display: flex!important;
+                align-items: center!important;
+                padding: 0 10px 0 52px;
+                box-shadow: 0 2px 8px rgba(0,0,0,.15);
+            }
+
+            /* Cancel the old "bottom toolbar" rule and let children flow inline */
+            .navbar .in-mobi-group{
+                position: static!important;
+                display: flex!important;
+                align-items: center!important;
+                width: auto!important;
+                height: auto!important;
+                bottom: auto!important;
+                left: auto!important;
+                right: auto!important;
+                margin: 0!important;
+                padding: 0!important;
+                background: transparent!important;
+                box-shadow: none!important;
+                gap: 4px;
+            }
+            .navbar .search-group-in-mobi{
+                position: static!important;
+                display: flex!important;
+                align-items: center!important;
+                width: auto!important;
+                padding: 0!important;
+                margin-left: auto!important;
+                margin-right: 4px!important;
+            }
+
+            /* Hamburger pinned to the left of the navbar */
+            .menu-icon-mobi{
+                position: fixed!important;
+                top: 14px!important;
+                left: 14px!important;
+                margin: 0!important;
+                z-index: 9991;
+                font-size: 22px;
+                color: #fff;
+                line-height: 1;
+            }
+            .menu-icon-mobi i{ color:#fff; }
+
+            /* Compact logo: only the round emblem, no wide university text */
+            .left-sidebar .logo-single{
+                position: fixed;
+                top: 0; left: 46px;
+                height: 56px;
+                z-index: 9991;
+                display: flex;
+                align-items: center;
+            }
+            .left-sidebar .logo-single img,
+            .small-sidebar .logo-single img{
+                position: static!important;
+                top: auto!important;
+                left: auto!important;
+                bottom: auto!important;
+                height: 38px!important;
+                width: 38px!important;
+                max-width: 38px!important;
+                object-fit: cover;
+                object-position: left center;
+                border-radius: 50%;
+                background: #fff;
+            }
+
+            /* Search: icon-only by default, expands when toggled .show */
+            .navbar .mobi-search-icon{
+                display: inline-flex!important;
+                align-items: center;
+                justify-content: center;
+                width: 36px; height: 36px;
+                margin: 0!important;
+                padding: 0!important;
+                font-size: 18px!important;
+                line-height: 1!important;
+                color: #fff!important;
+                cursor: pointer;
+                border-radius: 50%;
+                vertical-align: middle;
+            }
+            .navbar .mobi-search-icon:hover{ background: rgba(255,255,255,.12); }
+            .navbar .search-group{
+                display: none!important;
+            }
+            .navbar .search-group.show{
+                display: flex!important;
+                position: fixed!important;
+                top: 56px; left: 0; right: 0;
+                width: 100%!important;
+                margin: 0!important;
+                padding: 8px 12px;
+                background: #061b5b;
+                z-index: 9989;
+                visibility: visible!important;
+                box-shadow: 0 2px 6px rgba(0,0,0,.15);
+            }
+            .navbar .search-group.show .search-form{
+                width: 100%;
+                height: 38px;
+                background-color: rgba(255,255,255,.12);
+                color: #fff;
+                padding-left: 16px;
+                padding-right: 42px;
+                line-height: 38px;
+            }
+            .navbar .search-group.show button{
+                position: absolute!important;
+                top: 50%!important;
+                right: 16px!important;
+                transform: translateY(-50%)!important;
+                margin: 0!important;
+                padding: 0!important;
+                width: 28px; height: 28px;
+                display: inline-flex!important;
+                align-items: center!important;
+                justify-content: center!important;
+                font-size: 15px!important;
+                line-height: 1!important;
+                color: #cdd7f0!important;
+                background: transparent!important;
+                border: 0!important;
+            }
+            .navbar .search-group.show button i{
+                line-height: 1; display: block;
+            }
+
+            /* Bell button — keep visual, force white icon on dark bar */
+            .navbar #fcm-noti-button{
+                width: 36px!important; height: 36px!important;
+                margin: 0!important; padding: 0!important;
+                color: #fff!important;
+                display: inline-flex!important;
+                align-items: center!important;
+                justify-content: center!important;
+                vertical-align: middle;
+            }
+            .navbar #fcm-noti-button:hover,
+            .navbar #fcm-noti-button[aria-expanded="true"]{
+                background: rgba(255,255,255,.12)!important;
+                color: #fff!important;
+            }
+            .navbar #fcm-noti-button .fa-bell{ font-size: 18px; line-height:1; color:#fff; }
+            #fcm-noti-badge{ border-color:#061b5b!important; top: 2px!important; right: 2px!important; }
+
+            /* User dropdown — avatar only, hide name + chevron */
+            .navbar .nav-account{
+                margin: 0!important;
+                display: inline-flex!important;
+                align-items: center!important;
+            }
+            .navbar .nav-account .dropdown{
+                display: inline-flex!important;
+                align-items: center!important;
+            }
+            .navbar .nav-account button{
+                width: 36px!important; height: 36px!important;
+                margin: 0!important; padding: 0!important;
+                display: inline-flex!important;
+                align-items: center!important;
+                justify-content: center!important;
+                color: #fff!important;
+                background: transparent!important;
+                border: 0!important;
+                line-height: 1!important;
+                vertical-align: middle;
+            }
+            .navbar .nav-account button > span,
+            .navbar .nav-account .user-arrow{
+                display: none!important;
+            }
+            .navbar .nav-account .user-image{
+                width: 32px!important; height: 32px!important;
+                margin: 0!important;
+                padding: 0!important;
+                border-radius: 50%;
+                background: #fff;
+                box-shadow: 0 0 0 2px rgba(255,255,255,.85), 0 1px 3px rgba(0,0,0,.25);
+                overflow: hidden;
+                display: inline-flex!important;
+                align-items: center!important;
+                justify-content: center!important;
+            }
+            .navbar .nav-account .user-image img,
+            .navbar .nav-account .user-image #imgavatar{
+                width: 100%!important;
+                height: 100%!important;
+                object-fit: cover;
+                border-radius: 50%;
+                display: block;
+            }
+
+            /* Push page content below the fixed navbar */
+            .content-page .content{
+                margin-top: 56px;
+                height: calc(100vh - 56px)!important;
+            }
+        }
+
+        /* Extra-small phones: tighten spacing further */
+        @media (max-width: 380px){
+            .content-page > .navbar{ padding: 0 6px 0 46px; }
+            .left-sidebar .logo-single{ left: 42px; }
+            .menu-icon-mobi{ left: 10px!important; }
+            .navbar #fcm-noti-button,
+            .navbar .mobi-search-icon{ width: 32px!important; height: 32px!important; }
+            .navbar .nav-account .user-image{ width: 30px!important; height: 30px!important; }
+        }
+    </style>
+</head>
+
+<body>
+<div class="wrapper small-sidebar">
+    <div id="overlay" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2051; background: rgb(255, 255, 255); padding: 30px 55px; border-radius: 12px; box-shadow: rgba(0, 0, 0, 0.15) 0px 8px 30px; text-align: center; min-width: 220px; display: none;">
+        <i class="fas fa-spinner fa-spin fa-3x text-primary" style="color:#223771;"></i>
+        <h5 style="margin:18px 0 0; color:#223771; font-weight:600; font-size:15px;">Đang tải dữ liệu...</h5>
+    </div>
+    <div class="left-sidebar">
+        <div class="sidebar-top">
+            <a href="javascript:void(0)" class="menu-icon">
+                <i class="fal fa-indent"></i>
+            </a>
+            <a href="javascript:void(0)" class="menu-icon-mobi">
+                <i class="fal fa-indent"></i>
+            </a>
+            
+            <div class="logo-single">
+                <img src="logo.png" alt="">
+            </div>
+            <div class="line-1"></div>
+            <div class="line-2"></div>
+            <div class="line-hiden"></div>
+        </div>
+
+        <div class="sidebar-menu">
+            <div class="accordion">
+                <div class="sidebar-menu-item refeshtrangchu">
+                    <a class="sidebar-menu-header" href="#">
+                        <i class="fas fa-house item-icon"></i>
+                        <span>Trang chủ</span>
+                    </a>
+                </div>
+            </div>
+            <div class="accordion" id="sidebar-menu"><div class="sidebar-menu-item"><a class="sidebar-menu-header collapsed" id="chucnang15346B6F33834D7897591527289DB0F8" onclick="edu.system.initMain('#tintuc','/modules/tintuc/html/tintuc.html','15346B6F33834D7897591527289DB0F8')" href="#tintuc"><i class="fal fa-newspaper item-icon"></i><span>Tin tức</span></a></div><div class="sidebar-menu-item"><a class="sidebar-menu-header collapsed" id="chucnangC0BA880594CA49CBA9F75084940A20DF" href="" data-bs-toggle="collapse" data-bs-target="#collapseC0BA880594CA49CBA9F75084940A20DF"><i class="fal fa-id-card item-icon"></i><span>Thông tin hồ sơ</span><i class="fal fa-chevron-right item-arrow-icon"></i><i class="fal fa-chevron-down item-arrow-icon down"></i></a><div class="sidebar-menu-sub collapse" id="collapseC0BA880594CA49CBA9F75084940A20DF" data-bs-parent="#sidebar-menu"><a id="chucnang00C591A472C84BB89FB00F18B70C108B" onclick="edu.system.initMain('#tunhaphoso','/modules/profile/html/tunhaphoso.html','00C591A472C84BB89FB00F18B70C108B')" href="#tunhaphoso">Tự nhập hồ sơ</a></div></div><div class="sidebar-menu-item"><a class="sidebar-menu-header collapsed" id="chucnang41C2266E0ED749A3AEB177C3CEE21673" href="" data-bs-toggle="collapse" data-bs-target="#collapse41C2266E0ED749A3AEB177C3CEE21673"><i class="fal fa-book-open item-icon"></i><span>Góc học tập</span><i class="fal fa-chevron-right item-arrow-icon"></i><i class="fal fa-chevron-down item-arrow-icon down"></i></a><div class="sidebar-menu-sub collapse" id="collapse41C2266E0ED749A3AEB177C3CEE21673" data-bs-parent="#sidebar-menu"><a id="chucnang458922CCB7064213A3D94F7511852261" onclick="edu.system.initMain('#diemhoc','/modules/hoctap/html/diemhoc.html','458922CCB7064213A3D94F7511852261')" href="#diemhoc">Theo dõi kết quả học tập</a><a id="chucnang447511AE19614853B3F46E8F6027E4E8" onclick="edu.system.initMain('#chuontrinhhoc','/modules/hoctap/html/chuontrinhhoc.html','447511AE19614853B3F46E8F6027E4E8')" href="#chuontrinhhoc">Xem thông tin chương trình học</a><a id="chucnang4820BFE1ADCE41819FCF27E47CFF474E" onclick="edu.system.initMain('#congnhandiem','/modules/dangkyhoc/html/congnhandiemv3.html','4820BFE1ADCE41819FCF27E47CFF474E')" href="#congnhandiem">Đăng ký công nhận điểm</a><a id="chucnang3FC6DBD3CF2441FDBD35B08B0E46984E" onclick="edu.system.initMain('#phuckhao','/modules/hoctap/html/phuckhao.html','3FC6DBD3CF2441FDBD35B08B0E46984E')" href="#phuckhao">Đăng ký xin phúc khảo</a><a id="chucnangB17D6645A1EF4B91B314682F2E0C9E83" onclick="edu.system.initMain('#hoantotnghiep','/modules/hoctap/html/hoantotnghiep.html','B17D6645A1EF4B91B314682F2E0C9E83')" href="#hoantotnghiep">Xét tốt nghiệp</a></div></div><div class="sidebar-menu-item active"><a class="sidebar-menu-header collapsed" id="chucnangB4149861150F41A4B8687F513E02D726" href="" data-bs-toggle="collapse" data-bs-target="#collapseB4149861150F41A4B8687F513E02D726"><i class="fal fa-users-class item-icon"></i><span>Đăng ký trực tuyến</span><i class="fal fa-chevron-right item-arrow-icon"></i><i class="fal fa-chevron-down item-arrow-icon down"></i></a><div class="sidebar-menu-sub collapse" id="collapseB4149861150F41A4B8687F513E02D726" data-bs-parent="#sidebar-menu"><a id="chucnang6D01F8288B3146BAA9864693699E6CD0" onclick="edu.system.initMain('#dangkyhoc','/modules/dangkyhoc/html/dangky.html','6D01F8288B3146BAA9864693699E6CD0')" href="#dangkyhoc">Đăng ký học</a><a id="chucnangFFAE40F92EF444F2A1506B376D7AFCD6" onclick="edu.system.initMain('#nguyenvong','/modules/dangkyhoc/html/nguyenvong.html','FFAE40F92EF444F2A1506B376D7AFCD6')" href="#nguyenvong">Đăng ký nguyện vọng</a><a id="chucnangA9CE858670AE453B90BB0A74458EFA34" onclick="edu.system.initMain('#tracuu','/modules/dangkyhoc/html/tracuu.html','A9CE858670AE453B90BB0A74458EFA34')" href="#tracuu" class="active">Tra cứu kết quả đăng ký</a><a id="chucnang378608975F894E94B8CB4C428DD47E03" onclick="edu.system.initMain('#CSVDKDH','/modules/dangkyhoc/html/dinhhuong.html','378608975F894E94B8CB4C428DD47E03')" href="#CSVDKDH">Đăng ký định hướng học tập</a><a id="chucnang535F1E33BCF247D4BD572758EC8B6998" onclick="edu.system.initMain('#CSVDKTMT','/modules/dangkyhoc/html/thilai.html','535F1E33BCF247D4BD572758EC8B6998')" href="#CSVDKTMT">Đăng ký thi lại</a></div></div><div class="sidebar-menu-item"><a class="sidebar-menu-header collapsed" id="chucnang8EFEB0CD7D594881B9DF9FAED4A87C01" href="" data-bs-toggle="collapse" data-bs-target="#collapse8EFEB0CD7D594881B9DF9FAED4A87C01"><i class="fal fa-calendar-alt item-icon"></i><span>Thời khóa biểu</span><i class="fal fa-chevron-right item-arrow-icon"></i><i class="fal fa-chevron-down item-arrow-icon down"></i></a><div class="sidebar-menu-sub collapse" id="collapse8EFEB0CD7D594881B9DF9FAED4A87C01" data-bs-parent="#sidebar-menu"><a id="chucnangB46109CD333D4E3DAC50D43E8607ED46" onclick="edu.system.initMain('#lichhoc','/modules/thoikhoabieu/html/lichhoc.html','B46109CD333D4E3DAC50D43E8607ED46')" href="#lichhoc" class="">Lịch học</a><a id="chucnangAF6FFE7566A84F058C31083395D4ED4B" onclick="edu.system.initMain('#lichthi','/modules/thoikhoabieu/html/lichthi.html','AF6FFE7566A84F058C31083395D4ED4B')" href="#lichthi" class="">Lịch thi</a></div></div><div class="sidebar-menu-item"><a class="sidebar-menu-header collapsed" id="chucnang6AE93A478DA14E5692EB2E3210FB5D68" onclick="edu.system.initMain('#yeucau','/modules/thutuchanhchinh/html/yeucau.html','6AE93A478DA14E5692EB2E3210FB5D68')" href="#yeucau"><i class="fal fa-door-open item-icon"></i><span>Hệ thống một cửa</span></a></div><div class="sidebar-menu-item"><a class="sidebar-menu-header collapsed" id="chucnangDF52CE53C3884FAB94005CCF95C81B2D" href="" data-bs-toggle="collapse" data-bs-target="#collapseDF52CE53C3884FAB94005CCF95C81B2D"><i class="fal fa-sack-dollar item-icon"></i><span>Tài chính</span><i class="fal fa-chevron-right item-arrow-icon"></i><i class="fal fa-chevron-down item-arrow-icon down"></i></a><div class="sidebar-menu-sub collapse" id="collapseDF52CE53C3884FAB94005CCF95C81B2D" data-bs-parent="#sidebar-menu"><a id="chucnang7A425B5F926A4EFCAB2ACC5D0A9B8F36" onclick="edu.system.initMain('#tinhhinhhocphi','/modules/tinhhinhhocphi/html/tinhhinhhocphi.html','7A425B5F926A4EFCAB2ACC5D0A9B8F36')" href="#tinhhinhhocphi">Xem thông tài chính cá nhân</a><a id="chucnang40C82931C39C4FDC9AC5A6C4FDADA96A" onclick="edu.system.initMain('#thanhtoanonline','/modules/thanhtoanonline/html/thanhtoanonline.html','40C82931C39C4FDC9AC5A6C4FDADA96A')" href="#thanhtoanonline">Thanh toán trực tuyến</a></div></div><div class="sidebar-menu-item"><a class="sidebar-menu-header collapsed" id="chucnang98C5750098904AD999583AF7D4BB21E2" href="" data-bs-toggle="collapse" data-bs-target="#collapse98C5750098904AD999583AF7D4BB21E2"><i class="fal fa-file-alt item-icon"></i><span>Văn bản</span><i class="fal fa-chevron-right item-arrow-icon"></i><i class="fal fa-chevron-down item-arrow-icon down"></i></a><div class="sidebar-menu-sub collapse" id="collapse98C5750098904AD999583AF7D4BB21E2" data-bs-parent="#sidebar-menu"><a id="chucnang300D0F9D53BE4273870C991D03CE7BC2" onclick="edu.system.initMain('#vanban','/modules/tintuc/html/vanban.html','300D0F9D53BE4273870C991D03CE7BC2')" href="#vanban">Văn bản, quy định, biểu mẫu</a></div></div></div>
+        </div>
+    </div>
+    <div class="content-page ">
+        <!-- navbar -->
+        <div class="navbar">
+            <div class="search-group-in-mobi">
+                <i class="fal fa-search mobi-search-icon" style="display: inline;"></i>
+                <form class="search-group" id="globalSearchForm" autocomplete="off" onsubmit="return false;">
+                    <input type="text" id="globalSearchInput" class="search-form" placeholder="Tìm kiếm chức năng..." autocomplete="off">
+                    <button type="button"><i class="fal fa-search"></i></button>
+                    <div class="search-suggest" id="globalSearchSuggest" role="listbox"></div>
+                </form>
+            </div>
+            <div class="in-mobi-group">
+                <div class="nav-account">
+                    <div class="dropdown">
+                        <button id="fcm-noti-button" type="button" data-bs-toggle="dropdown" aria-expanded="false" class="position-relative">
+                            <i class="fal fa-bell"></i>
+                            <span id="fcm-noti-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none">0</span>
+                        </button>
+
+                        <ul id="fcm-noti-menu" class="dropdown-menu dropdown-menu-end"><li class="fcm-noti-header"><h6><i class="fal fa-bell"></i> Thông báo</h6></li><li class="fcm-noti-list-wrap"><div class="fcm-noti-empty" id="fcm-noti-empty"><div class="fcm-noti-empty-icon"><i class="fal fa-bell-slash"></i></div><p>Chưa có thông báo nào</p><span>Các thông báo mới sẽ hiển thị ở đây</span></div></li></ul>
+                    </div>
+                </div>
+                <div class="nav-account">
+                    <div class="dropdown">
+                        <button class=" " type="button" data-bs-toggle="dropdown">
+                            <div class="user-image">
+                                <img class="user-image" id="imgavatar" src="https://qldt.eaut.edu.vn/upload/Core/images/no-avatar.png">
+                            </div>
+                            <span>Phùng Vĩnh Thùy</span>
+                            <i class="fal fa-chevron-down user-arrow"></i>
+
+
+                        </button>
+                        
+                        <ul class="dropdown-menu user-drop">
+                            <li class="img-user">
+                                <div class="user-avata-img">
+                                    <img src="assets/images/avata.png" id="lblAvatar">
+                                </div>
+                                <span id="lblHoTenNguoiDangNhap">Phùng Vĩnh Thùy</span>
+                                
+                            </li>
+                            <li><a class="dropdown-item" href="Pages/ChangePass.aspx"><i class="fal fa-key-skeleton"></i>Thay đổi mật
+                                khẩu</a></li>
+                            <li><a class="dropdown-item" id="btnLogout" style="cursor: pointer"><i class="fal fa-sign-out"></i>Đăng xuất</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script type="text/javascript">AXYZCLRVN = () => "OlgIPC4OKjI1ElhpY1UZPC8dDjsuFB0nKBRYf2MIFTw1KhsnKS8KPy4bHnF7WFUmMRYVMiVYVnE0CR8hCB5YaWNLTmEDTDllAExKEnVOS2d0OEIWAE9JYgNCSGUHOEsRcFhWcTUVETYvMC0HY0BYNjgwEjEGGRMcKDAzBjszSx0oMwkaLyhPMAIzTBoqCiIFAjBDfSQDMGIjFxYrJS0sNSMXPCcbKTNlCBA/YwwRM2EQACARDxA4EQ8+KysPPiwQDj8sEQ8uNysQEB0qDxEgEAwvMysOADdiD0g3YBstMD8PSCg/DAArYBgtN2YbLSMqDD0oPw8QI2MPLiA/DwAdKw4AMyQMECMkDxA7ZgwQPyQPEDckCBMNOiMXMD4IEBUrDwAdKww+PykOLhEkDTkwPyQyOzoOED9gDj43YQw+L2YOLjsgCBcWOyU5M2UMLhlnDC47KwwAEWYMOQ06ICI0KQgQFTogMihjIj4VJQ1IAiUYSDwgID1DKSU5MyAIFzxiGzkzZQgXEmMlMjtlDQNDICNINDsjPRIlIkkrOicrVGIqV0k4FQwNIxIMCCApSU47Fg1OGQwxHTwSFioFcAMlIzcpTSYEMxkLGxFYf2MIGyUkFFhpYwA2CykPLR8JT0IqKQ0VJBs9ImVuLQsBMzYTPA4qKDV2CiIlCBxJITk5NiE2AyhqJzYZIXETO2FwIk4neSIKJSgeEjsNDEwxNkk9OwQZHyEXFigbODEVOSVPH2UMTko+OTAxEDNJEDgSFykYbhkABgk/AhU0Qwg+CwgdY3YcPDA1LB0XCgwWODMJFBobThkZcyguOzQvDRkYKQIBDBQjaicXEGtzMgoheFEpNjEACzgTKz8KBiIKESctPXwLHS8DKTE0Ei9VHBp4GA48KzIgFy9PDGsXAE4pDBU4HxMsPCE7Kjk1Jhg+Gi0UPAM4DkIlMyMCKyorMwJwLBtgFD4/AQ9VQik2EUwyNQ5VeCYNEAoYFUMSNS89JgxCPGEqNhIpBDtPY3UcGyd2KCk7DAsLFCIUQxt5IFUgCEgfEjQZFxctDTUdFi1RO3UALCMRLxg2MQ0SYBQ4HW58WAc="</script>
+
+        <!-- end navbar -->
+        <!-- end navbar -->
+        <!-- content -->
+        <div class="content" id="main-content-wrapper"><style>
+    .classroom-detail {
+        padding-left: 7px
+    }
+</style>
+<div class="row class-reg-search">
+    <div class="col-12 col-lg-8">
+        <div class="row">
+            <div class="col-12 col-md-4 lable te">Kế hoạch đăng ký hoc</div>
+            <div class="col-12 col-md-4 class-reg-search-item">
+                <div class="form-item  form-add-info">
+                    <div class="input-group">
+                        <i class="fal fa-angle-down"></i>
+                        <select class="form-select" aria-label="Default select example" id="dropSearch_HocKy"><option value="">Chọn học kỳ</option><option id="undefined" value="D88F0E10E1D947BFA58EC9C7F54DC404" name="undefined"> 2025_2026_2</option></select>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4 class-reg-search-item">
+                <div class="form-item  form-add-info">
+                    <div class="input-group">
+                        <i class="fal fa-angle-down"></i>
+                        <select class="form-select" aria-label="Default select example" id="dropSearch_KeHoach"><option value="">Chọn kế hoạch</option><option id="undefined" value="A34831B73EF74DCEAF96E51C9F7B0297" name="undefined"> 2025_2026_2,1</option><option id="undefined" value="2C293A8CD3E94799A39BBC8418DE679F" name="undefined"> 2025_2026_2,3_QPAN</option></select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-4 class-reg-search-btn pr-0">
+        <a class="btn btn-dask-blue ml-10" style="cursor: pointer" id="btnXemKetQuaDangKy">
+            <i class="far fa-search"></i> Xem</a>
+        <div class="btn btn-success ml-10" id="btnXacNhanTatCa">
+            <i class="far fa-check-double mr-5"></i>Xác nhận tất cả
+        </div>
+        <div class="dropdown" id="zonebtnBaoCao_TraCuu">
+        </div>
+    </div>
+</div>
+<div id="class-reg-list" class="class-group">
+    <div class="classroom-section-list masonry-bq" id="zoneKetQuaDangKy"><div id="zonemasonrybq"><div class="subject-item"><div class="d-flex align-items-center"><h4>Môn Lập trình mạng</h4><div class="d-flex mb-2 mt-1 justify-content-end flex-shrink-0 ms-auto"><button class="btnXacNhanDKH btn btn-white" id="6AFFEE586BE5433A8DEC5DEF646D44F8"> Xác nhận kết quả đăng ký</button> <input type="checkbox" checked="checked" id="checkX6AFFEE586BE5433A8DEC5DEF646D44F8"></div></div><div class="classroom-section-item"><div class="box-classroom-section box-shadow"><div class="lable"><a href="#" id="lblTenLop6AFFEE586BE5433A8DEC5DEF646D44F8" name="8DD7F956127F4C1B8D9FE3E633039CBC" title="LTM.03.K15.09.LH.C04.1_LT" class="btnChiTietLopHocPhan" style="cursor: pointer">LTM.03.K15.09.LH.C04.1_LT</a></div><div class="classroom-detail d-flex "><div class="classroom-detail-sum"><p class="">Ly thuyet</p><p>Tổng số: 52</p><p>Đã đăng ký: 52</p></div><div class="classroom-day"><p>23/03/2026 - 19/04/2026</p><p>Thứ: 2,4,6</p><p></p></div></div><div class="classroom-button d-flex justify-content-between"><div class="price"><b>0</b> đ</div><div class="btn-group"><button class="btn btn-view-detail btnChiTietDiemDanh" id="8DD7F956127F4C1B8D9FE3E633039CBC" title="LTM.03.K15.09.LH.C04.1_LT">Điểm danh</button><button class="btn btn-view-detail btnChiTietDiemQuaTrinh" id="8DD7F956127F4C1B8D9FE3E633039CBC" title="LTM.03.K15.09.LH.C04.1_LT">Điểm quá trình</button><button class="btn btn-view-detail btnChiTietLopHocPhan" id="8DD7F956127F4C1B8D9FE3E633039CBC" title="LTM.03.K15.09.LH.C04.1_LT">Chi tiết</button></div></div></div></div><div class="classroom-section-item"><div class="box-classroom-section box-shadow"><div class="lable"><a href="#" id="lblTenLop50AC6995123C463DB60EEA86A904075F" name="8DD3ED87C18342F1A3236DB2CA3C286E" title="LTM.03.K15.09.LH.C04.1_LT.1_TH" class="btnChiTietLopHocPhan" style="cursor: pointer">LTM.03.K15.09.LH.C04.1_LT.1_TH</a></div><div class="classroom-detail d-flex "><div class="classroom-detail-sum"><p class="">Thực hành tại trường</p><p>Tổng số: 52</p><p>Đã đăng ký: 52</p></div><div class="classroom-day"><p>13/04/2026 - 26/04/2026</p><p>Thứ: 2,4,6</p><p></p></div></div><div class="classroom-button d-flex justify-content-between"><div class="price"><b>0</b> đ</div><div class="btn-group"><button class="btn btn-view-detail btnChiTietDiemDanh" id="8DD3ED87C18342F1A3236DB2CA3C286E" title="LTM.03.K15.09.LH.C04.1_LT.1_TH">Điểm danh</button><button class="btn btn-view-detail btnChiTietDiemQuaTrinh" id="8DD3ED87C18342F1A3236DB2CA3C286E" title="LTM.03.K15.09.LH.C04.1_LT.1_TH">Điểm quá trình</button><button class="btn btn-view-detail btnChiTietLopHocPhan" id="8DD3ED87C18342F1A3236DB2CA3C286E" title="LTM.03.K15.09.LH.C04.1_LT.1_TH">Chi tiết</button></div></div></div></div></div><div class="subject-item"><div class="d-flex align-items-center"><h4>Môn Tiếng anh Chuyên ngành</h4><div class="d-flex mb-2 mt-1 justify-content-end flex-shrink-0 ms-auto"><button class="btnXacNhanDKH btn btn-white" id="B12EC45955A34A1795AB371AB2B6CF0B"> Xác nhận kết quả đăng ký</button> <input type="checkbox" checked="checked" id="checkXB12EC45955A34A1795AB371AB2B6CF0B"></div></div><div class="classroom-section-item"><div class="box-classroom-section box-shadow"><div class="lable"><a href="#" id="lblTenLopB12EC45955A34A1795AB371AB2B6CF0B" name="1EF7F0B965A1461EBB67B0D6C5A04DE4" title="TACN.03.K15.09.LT.C04.1_LT" class="btnChiTietLopHocPhan" style="cursor: pointer">TACN.03.K15.09.LT.C04.1_LT</a></div><div class="classroom-detail d-flex "><div class="classroom-detail-sum"><p class="">Ly thuyet</p><p>Tổng số: 54</p><p>Đã đăng ký: 54</p></div><div class="classroom-day"><p>29/12/2025 - 01/02/2026</p><p>Thứ: 2,6</p><p></p></div></div><div class="classroom-button d-flex justify-content-between"><div class="price"><b>0</b> đ</div><div class="btn-group"><button class="btn btn-view-detail btnChiTietDiemDanh" id="1EF7F0B965A1461EBB67B0D6C5A04DE4" title="TACN.03.K15.09.LT.C04.1_LT">Điểm danh</button><button class="btn btn-view-detail btnChiTietDiemQuaTrinh" id="1EF7F0B965A1461EBB67B0D6C5A04DE4" title="TACN.03.K15.09.LT.C04.1_LT">Điểm quá trình</button><button class="btn btn-view-detail btnChiTietLopHocPhan" id="1EF7F0B965A1461EBB67B0D6C5A04DE4" title="TACN.03.K15.09.LT.C04.1_LT">Chi tiết</button></div></div></div></div></div><div class="subject-item"><div class="d-flex align-items-center"><h4>Môn Giáo dục Quốc phòng - an ninh</h4><div class="d-flex mb-2 mt-1 justify-content-end flex-shrink-0 ms-auto"><button class="btnXacNhanDKH btn btn-white" id="075571916CC44F39B0BF0A6DB78F6E41"> Xác nhận kết quả đăng ký</button> <input type="checkbox" checked="checked" id="checkX075571916CC44F39B0BF0A6DB78F6E41"></div></div><div class="classroom-section-item"><div class="box-classroom-section box-shadow"><div class="lable"><a href="#" id="lblTenLop075571916CC44F39B0BF0A6DB78F6E41" name="80042B2178714F2181FC03E19CC48479" title="Giáo dục Quốc phòng - an ninh-3-2-25(N02)" class="btnChiTietLopHocPhan" style="cursor: pointer">Giáo dục Quốc phòng - an ninh-3-2-25(N02)</a></div><div class="classroom-detail d-flex "><div class="classroom-detail-sum"><p class="">Ly thuyet</p><p>Tổng số: 1481</p><p>Đã đăng ký: 1284</p></div><div class="classroom-day"><p> - </p><p>Thứ: </p><p></p></div></div><div class="classroom-button d-flex justify-content-between"><div class="price"><b>1,200,000</b> đ</div><div class="btn-group"><button class="btn btn-view-detail btnChiTietDiemDanh" id="80042B2178714F2181FC03E19CC48479" title="Giáo dục Quốc phòng - an ninh-3-2-25(N02)">Điểm danh</button><button class="btn btn-view-detail btnChiTietDiemQuaTrinh" id="80042B2178714F2181FC03E19CC48479" title="Giáo dục Quốc phòng - an ninh-3-2-25(N02)">Điểm quá trình</button><button class="btn btn-view-detail btnChiTietLopHocPhan" id="80042B2178714F2181FC03E19CC48479" title="Giáo dục Quốc phòng - an ninh-3-2-25(N02)">Chi tiết</button></div></div></div></div></div><div class="subject-item"><div class="d-flex align-items-center"><h4>Môn Lịch sử Đảng Cộng sản Việt Nam (History of the Communist Party of Vietnam)</h4><div class="d-flex mb-2 mt-1 justify-content-end flex-shrink-0 ms-auto"><button class="btnXacNhanDKH btn btn-white" id="77D03065025D44989E4B9FB1C5B29083"> Xác nhận kết quả đăng ký</button> <input type="checkbox" checked="checked" id="checkX77D03065025D44989E4B9FB1C5B29083"></div></div><div class="classroom-section-item"><div class="box-classroom-section box-shadow"><div class="lable"><a href="#" id="lblTenLop77D03065025D44989E4B9FB1C5B29083" name="89149731FC1A4E048A3E27F0F5F28212" title="LSĐCSVN.01.K15.03.LT.C04C12.1_LT" class="btnChiTietLopHocPhan" style="cursor: pointer">LSĐCSVN.01.K15.03.LT.C04C12.1_LT</a></div><div class="classroom-detail d-flex "><div class="classroom-detail-sum"><p class="">Ly thuyet</p><p>Tổng số: 224</p><p>Đã đăng ký: 224</p></div><div class="classroom-day"><p> - </p><p>Thứ: </p><p></p></div></div><div class="classroom-button d-flex justify-content-between"><div class="price"><b>0</b> đ</div><div class="btn-group"><button class="btn btn-view-detail btnChiTietDiemDanh" id="89149731FC1A4E048A3E27F0F5F28212" title="LSĐCSVN.01.K15.03.LT.C04C12.1_LT">Điểm danh</button><button class="btn btn-view-detail btnChiTietDiemQuaTrinh" id="89149731FC1A4E048A3E27F0F5F28212" title="LSĐCSVN.01.K15.03.LT.C04C12.1_LT">Điểm quá trình</button><button class="btn btn-view-detail btnChiTietLopHocPhan" id="89149731FC1A4E048A3E27F0F5F28212" title="LSĐCSVN.01.K15.03.LT.C04C12.1_LT">Chi tiết</button></div></div></div></div></div><div class="subject-item"><div class="d-flex align-items-center"><h4>Môn Toán rời rạc</h4><div class="d-flex mb-2 mt-1 justify-content-end flex-shrink-0 ms-auto"><button class="btnXacNhanDKH btn btn-white" id="9988CCB0B3F14C6CB4F11F980AFF24DB"> Xác nhận kết quả đăng ký</button> <input type="checkbox" checked="checked" id="checkX9988CCB0B3F14C6CB4F11F980AFF24DB"></div></div><div class="classroom-section-item"><div class="box-classroom-section box-shadow"><div class="lable"><a href="#" id="lblTenLop9988CCB0B3F14C6CB4F11F980AFF24DB" name="17E50EF19DE741C89C9BD0900D41B07B" title="TRR.03.K15.09.LT.C04.1_LT" class="btnChiTietLopHocPhan" style="cursor: pointer">TRR.03.K15.09.LT.C04.1_LT</a></div><div class="classroom-detail d-flex "><div class="classroom-detail-sum"><p class="">Ly thuyet</p><p>Tổng số: 72</p><p>Đã đăng ký: 72</p></div><div class="classroom-day"><p>29/12/2025 - 25/01/2026</p><p>Thứ: 2,4,6</p><p></p></div></div><div class="classroom-button d-flex justify-content-between"><div class="price"><b>0</b> đ</div><div class="btn-group"><button class="btn btn-view-detail btnChiTietDiemDanh" id="17E50EF19DE741C89C9BD0900D41B07B" title="TRR.03.K15.09.LT.C04.1_LT">Điểm danh</button><button class="btn btn-view-detail btnChiTietDiemQuaTrinh" id="17E50EF19DE741C89C9BD0900D41B07B" title="TRR.03.K15.09.LT.C04.1_LT">Điểm quá trình</button><button class="btn btn-view-detail btnChiTietLopHocPhan" id="17E50EF19DE741C89C9BD0900D41B07B" title="TRR.03.K15.09.LT.C04.1_LT">Chi tiết</button></div></div></div></div></div><div class="subject-item"><div class="d-flex align-items-center"><h4>Môn Phương pháp tính toán tối ưu</h4><div class="d-flex mb-2 mt-1 justify-content-end flex-shrink-0 ms-auto"><button class="btnXacNhanDKH btn btn-white" id="58B0CAAEC28B40B7862C8214E6CC5696"> Xác nhận kết quả đăng ký</button> <input type="checkbox" checked="checked" id="checkX58B0CAAEC28B40B7862C8214E6CC5696"></div></div><div class="classroom-section-item"><div class="box-classroom-section box-shadow"><div class="lable"><a href="#" id="lblTenLop58B0CAAEC28B40B7862C8214E6CC5696" name="675258728A9F4F5A85A2E184B9224D38" title="PPTTTU.03.K15.09.LT.C04.1_LT" class="btnChiTietLopHocPhan" style="cursor: pointer">PPTTTU.03.K15.09.LT.C04.1_LT</a></div><div class="classroom-detail d-flex "><div class="classroom-detail-sum"><p class="">Ly thuyet</p><p>Tổng số: 67</p><p>Đã đăng ký: 67</p></div><div class="classroom-day"><p>23/03/2026 - 19/04/2026</p><p>Thứ: 2,4,6</p><p></p></div></div><div class="classroom-button d-flex justify-content-between"><div class="price"><b>0</b> đ</div><div class="btn-group"><button class="btn btn-view-detail btnChiTietDiemDanh" id="675258728A9F4F5A85A2E184B9224D38" title="PPTTTU.03.K15.09.LT.C04.1_LT">Điểm danh</button><button class="btn btn-view-detail btnChiTietDiemQuaTrinh" id="675258728A9F4F5A85A2E184B9224D38" title="PPTTTU.03.K15.09.LT.C04.1_LT">Điểm quá trình</button><button class="btn btn-view-detail btnChiTietLopHocPhan" id="675258728A9F4F5A85A2E184B9224D38" title="PPTTTU.03.K15.09.LT.C04.1_LT">Chi tiết</button></div></div></div></div></div><div class="subject-item"><div class="d-flex align-items-center"><h4>Môn Tư tưởng Hồ Chí Minh (Ho Chi Minh Thought)</h4><div class="d-flex mb-2 mt-1 justify-content-end flex-shrink-0 ms-auto"><button class="btnXacNhanDKH btn btn-white" id="ACADE269D52D43A78078EE5A508BCC0E"> Xác nhận kết quả đăng ký</button> <input type="checkbox" checked="checked" id="checkXACADE269D52D43A78078EE5A508BCC0E"></div></div><div class="classroom-section-item"><div class="box-classroom-section box-shadow"><div class="lable"><a href="#" id="lblTenLopACADE269D52D43A78078EE5A508BCC0E" name="0C25CD26A93A454B9E5F3953CEC49708" title="TTHCM.01.K15.09.LT.C03C04.1_LT" class="btnChiTietLopHocPhan" style="cursor: pointer">TTHCM.01.K15.09.LT.C03C04.1_LT</a></div><div class="classroom-detail d-flex "><div class="classroom-detail-sum"><p class="">Ly thuyet</p><p>Tổng số: 196</p><p>Đã đăng ký: 196</p></div><div class="classroom-day"><p> - </p><p>Thứ: </p><p></p></div></div><div class="classroom-button d-flex justify-content-between"><div class="price"><b>0</b> đ</div><div class="btn-group"><button class="btn btn-view-detail btnChiTietDiemDanh" id="0C25CD26A93A454B9E5F3953CEC49708" title="TTHCM.01.K15.09.LT.C03C04.1_LT">Điểm danh</button><button class="btn btn-view-detail btnChiTietDiemQuaTrinh" id="0C25CD26A93A454B9E5F3953CEC49708" title="TTHCM.01.K15.09.LT.C03C04.1_LT">Điểm quá trình</button><button class="btn btn-view-detail btnChiTietLopHocPhan" id="0C25CD26A93A454B9E5F3953CEC49708" title="TTHCM.01.K15.09.LT.C03C04.1_LT">Chi tiết</button></div></div></div></div></div></div></div>
+</div>
+
+<!-- Modal Phenikaa-4-Dang-ky-m2-xem-chi-thiet-->
+<div class="modal fade detail-classroom modal-myModalChiTietLich" id="myModalChiTietLich" tabindex="-1" aria-labelledby="myModalChiTietLich" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="zoomfileLabel">
+                    Chi tiết - <span id="lblChiTietHocPhan"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="aps-table-select scroll-table-x">
+                    <table class="table table-classroom tblLichHoc table-noborder" id="tblLichHoc">
+                        <thead>
+                            <tr>
+                                <th class="text-center w-50px">STT</th>
+                                <th class="">Buổi học</th>
+                                <th class="">Ngày bắt đầu</th>
+                                <th>Ngày kết thúc</th>
+                                <th>Thứ</th>
+                                <th class="text-center">Số tiết</th>
+                                <th class="text-center">Tiết bắt đầu</th>
+                                <th class="text-center">Tiết kết thúc</th>
+                                <th>Phòng học</th>
+                                <th>Giảng viên</th>
+                                <th>Kiểu học</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-back" data-toggle="modal" data-bs-dismiss="modal">
+                    <i class="fal fa-arrow-left"></i> Quay
+                    lại
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Modal Phenikaa-4-Dang-ky-m2-diem-danh-->
+<div class="modal fade detail-classroom modal-diem_danh" id="diem_danh" tabindex="-1" aria-labelledby="zoomfileLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-860 modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title " id="zoomfileLabel">
+                    <span>Kết quả điểm danh: </span><span class="zoomfileLabel"></span> - <span class="zoomTinhTrangLabel" style="color: orange"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="aps-table-select scroll-table-x">
+                    <table class="table table-classroom tabs-scores tblDiemDanh table-noborder" id="tblDiemDanh">
+                        <thead>
+                            <tr>
+                                <th class="text-center w-50px">STT</th>
+                                <th class="text-center">Ngày học</th>
+                                <th class="text-center">Tiết bắt đầu <i class="fas fa-arrow-right"></i>Tiết kết thúc
+                                </th>
+                                <th class="text-center">Trạng thái</th>
+                                <th class="text-center">Số tiết</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Điểm quá trình -->
+<div class="modal fade detail-classroom modal-diem_qua_trinh" id="diem_qua_trinh" tabindex="-1" aria-labelledby="zoomfileLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-680 modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="zoomfileLabel">
+                    <span>Điểm quá trình: </span><span class="zoomfileLabel"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="aps-table-select scroll-table-x">
+                    <table class="table table-classroom tabs-scores table-noborder tblDiemQuaTrinh" id="tblDiemQuaTrinh">
+                        <thead>
+                            <tr>
+                                <th class="text-center w-50px">STT</th>
+                                <th class="">Loại điểm</th>
+                                <th class="text-center">Kết quả</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--<div class="modal fade" id="modal_XacNhan">
+    <div class="modal-dialog modal-dialog-centered modal-680">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-wrap">
+                    <div class="title"><i class="fa-light fa-check-circle me-10"></i>Xác nhận kết quả đăng ký</div>
+
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex align-items-end flex-wrap flex-md-nowrap col-12">
+                    <div class="flex-grow-1">
+                        <div class="input-label-left mb-15">
+                            <label class="mt-5">Loại xác nhận</label>
+                            <div class="custom-select">
+                                <select name="" id="dropLoaiXacNhan" class="form-select select-opt"></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-end flex-wrap flex-md-nowrap col-12">
+                    <div class="flex-grow-1">
+                        <div class="input-label-left mb-15">
+                            <label class="mt-5">Trạng thái xác nhận</label>
+                            <div class="custom-select">
+                                <select name="" id="dropTrangThaiXacNhan" class="form-select select-opt"></select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0">
+                        <div class="btn btn-save ms-20 mb-15 btnSave_XacNhan"><i class="fa-light fa-check"></i><span>Đồng ý</span></div>
+                    </div>
+                </div>
+
+                <div class="fw-bold text-main mt-20 mb-10">Lịch sử xác nhận</div>
+                <div class="table-responsive fs-14 no-swiper">
+                    <table class="table" id="tblModal_XacNhan">
+                        <thead>
+                            <tr>
+                                <th class="text-center border-top-1" scope="col">STT</th>
+                                <th class=" border-top-1" scope="col">Trạng thái</th>
+                                <th class=" border-top-1 py-11" scope="col">Người xác nhận</th>
+                                <th class=" border-top-1  py-11" scope="col">Thời gian </th>
+
+                            </tr>
+
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>-->
+
+<!-- modal Xác nhận kết quả đăng ký-->
+<div class="modal fade finance-modal my-calendar confirm_scores modal_XacNhan" id="modal_XacNhan" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-680 modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="finance-user-info in-modal">
+                    <p><b>Xác nhận kết quả đăng ký</b></p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pd20">
+                <div class="aps-form-xacnhan">
+                    <div class="action-group">
+                        <div class="select-group">
+                            <div class="label">Loại xác nhận</div>
+                            <div class="form-item d-flex form-add-info">
+                                <div class="input-group no-icon">
+                                    <select name="" id="dropLoaiXacNhan" class="form-select select-opt select2-hidden-accessible" tabindex="-1" aria-hidden="true"><option value="">-- Không tìm thấy dữ liệu! --</option></select><span class="select2 select2-container select2-container--default" dir="ltr" style="width: 1px;"><span class="selection"><span class="select2-selection select2-selection--single" role="combobox" aria-haspopup="true" aria-expanded="false" tabindex="0" aria-labelledby="select2-dropLoaiXacNhan-container"><span class="select2-selection__rendered" id="select2-dropLoaiXacNhan-container" title="-- Không tìm thấy dữ liệu! --">-- Không tìm thấy dữ liệu! --</span><span class="select2-selection__arrow" role="presentation"><b role="presentation"></b></span></span></span><span class="dropdown-wrapper" aria-hidden="true"></span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="action-group">
+                        <div class="select-group">
+                            <div class="label">Trạng thái xác nhận</div>
+                            <div class="form-item d-flex form-add-info">
+                                <div class="input-group no-icon">
+                                    <select name="" id="dropTrangThaiXacNhan" class="form-select select-opt select2-hidden-accessible" tabindex="-1" aria-hidden="true"></select><span class="select2 select2-container select2-container--default" dir="ltr" style="width: 1px;"><span class="selection"><span class="select2-selection select2-selection--single" role="combobox" aria-haspopup="true" aria-expanded="false" tabindex="0" aria-labelledby="select2-dropTrangThaiXacNhan-container"><span class="select2-selection__rendered" id="select2-dropTrangThaiXacNhan-container"></span><span class="select2-selection__arrow" role="presentation"><b role="presentation"></b></span></span></span><span class="dropdown-wrapper" aria-hidden="true"></span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-success btnSave_XacNhan">
+                            <i class="fal fa-check me-2"></i> <span>Đồng ý</span>
+                        </button>
+                    </div>
+                    <p class="fw-bold mb-2">Lịch sử xác nhận</p>
+                    <div class="aps-table-select scroll-table-x">
+                        <table class="table transcrip-table tabs-scores fs-14 table-noborder tblModal_XacNhan" id="tblModal_XacNhan">
+                            <thead>
+                                <tr>
+                                    <th class="text-center w-50px" scope="col">STT</th>
+                                    <th scope="col">Trạng thái xác nhận</th>
+                                    <th scope="col">Người xác nhận</th>
+                                    <th class="text-center" scope="col">Thời gian</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- page script -->
+<script src="ApisCongSinhVien/modules/dangkyhoc/script/tracuu.js?v=3117.7869.4064.3650"></script>
+<script type="text/javascript">
+    var main_doc = {};
+    main_doc['TraCuu'] = new TraCuu();
+    $(document).ready(function () {
+        main_doc.TraCuu.init();
+    });
+</script></div><div id="modalBaoCao" class="modal fade finance-modal my-calendar confirm_scores" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true"><div class="modal-dialog" style="width: 740px;max-width: 740px"><div class="modal-content"><div class="modal-header"><div class="finance-user-info in-modal "><p><b>Báo cáo</b></p> <a class="btn btn-primary" id="btnDownloadFileBaoCao" title="" href="#"><i class="fa fa-cloud-download"></i> Tải file</a></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">×<span class="sr-only">Close</span></button></div><div class="modal-body" id="modal_body"></div><div class="modal-footer"><button type="button" class="btn btn-default" data-bs-dismiss="modal"><i class="fa fa-times-circle-o"></i> <span class="lang" key="">Đóng</span></button></div></div></div></div>
+        <!-- end content -->
+        <div id="alert"></div>
+        <!-- copy right -->
+        <div class="copyright ">
+            <marquee>
+                Đơn vị phát triển: Công ty Cổ Phần dịch vụ Công nghệ APIS - Địa chỉ: Tầng 6 Tháp Tây, Tòa nhà Hancorp,
+                Số, 72 Trần Đăng Ninh, P, Cầu Giấy, Hà Nội - Điện thoại: 024 3204 5867
+            </marquee>
+        </div>
+        <!-- end copy right -->
+
+    </div>
+    <div class="chat-single-group">
+
+        <div class="chat-box-group" id="zoneChat">
+        </div>
+    </div>
+</div>
+
+<!-- modal canh bao no hoc phi - cap index (fire som, khong doi dashboard load) -->
+<div class="modal fade" id="modalCanhBaoNoHocPhi_idx" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content" style="border:0;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(15,30,70,.25);">
+            <div class="modal-header" style="background:linear-gradient(135deg,#e85d04 0%,#fb923c 100%);color:#fff;border:0;padding:16px 22px;align-items:center;">
+                <div style="display:flex;align-items:center;gap:10px;flex:1;">
+                    <i class="fal fa-exclamation-triangle" style="font-size:20px;color:#fff;"></i>
+                    <h5 class="modal-title" style="margin:0;font-weight:600;font-size:16px;color:#fff;">Nhắc nhở học phí</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="background:transparent;border:0;color:#fff;font-size:20px;cursor:pointer;opacity:.9;line-height:1;padding:0;">
+                    <i class="fal fa-times" style="color:#fff;"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding:22px;text-align:center;">
+                <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#fff5f0 0%,#ffe2d4 100%);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;">
+                    <i class="fal fa-piggy-bank" style="font-size:36px;color:#e85d04;"></i>
+                </div>
+                <h6 style="font-weight:600;font-size:17px;color:#1f2a44;margin:0 0 6px;">Bạn đang nợ học phí</h6>
+                <p style="font-size:13px;color:#5b6b8c;margin:0 0 4px;">Số tiền cần thanh toán</p>
+                <p id="lblSoTienNoModal_idx" style="font-size:26px;font-weight:700;color:#e85d04;margin:0 0 12px;line-height:1.2;">0 đ</p>
+                <p style="font-size:13px;color:#8a96b3;line-height:1.5;margin:0;font-style:italic;">Vui lòng hoàn tất nghĩa vụ học phí để không ảnh hưởng đến quá trình học tập của bạn.</p>
+            </div>
+            <div class="modal-footer" style="border:0;justify-content:center;padding:0 22px 22px;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn" data-bs-dismiss="modal" style="background:#f3f5fb;color:#5b6b8c;border:0;padding:10px 18px;border-radius:8px;font-weight:500;font-size:14px;cursor:pointer;">Để sau</button>
+                <button type="button" class="btn" id="btnXemHocPhiModal_idx" style="background:#fff;color:#e85d04;border:2px solid #e85d04;padding:8px 18px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">Xem chi tiết</button>
+                <button type="button" class="btn" id="btnThanhToanModal_idx" style="background:linear-gradient(135deg,#e85d04 0%,#fb923c 100%);color:#fff;border:0;padding:10px 20px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;box-shadow:0 4px 12px rgba(232,93,4,.3);"><i class="fal fa-credit-card" style="margin-right:6px;"></i>Thanh toán</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- end modal canh bao no hoc phi - cap index -->
+
+
+<script src="assets/js/bootstrap.bundle.min.js "></script>
+<script src="assets/js/jquery-2.2.0.min.js" type="text/javascript"></script>
+<script src="assets/js/jquery-ui.min.js" type="text/javascript"></script>
+<script src="assets/js/select2.min.js"></script>
+<script src="assets/js/swiper-bundle.min.js"></script>
+<script src="assets/js/slick.js"></script>
+<script src="assets/js/tab.js"></script>
+<script src="assets/js/crypto-js.js?v=32"></script>
+<script src="assets/pagination/jquery.simplePagination.min.js?v=331"></script>
+<script src="assets/js/masonry.pkgd.min.js"></script>
+<script src="assets/js/custom.js"></script>
+<script src="assets/js/cleave.min.js"></script>
+    
+    <script type="text/javascript" src="Core/constant.js?v=d6e25f63-f7a7-494c-b1d5-50203b6f6e8a"></script>    <!--CORE JS-->
+    <script type="text/javascript" src="Core/systemroot.js?v=be055f97-50b3-4df6-8007-8b97175ea73c"></script>  <!--CORE JS-->
+    <script type="text/javascript" src="Core/util.js?v=52ae9633-d1a1-43dd-a121-bb2ee2a4b9ec"></script>        <!--CORE JS-->
+    <script type="text/javascript" src="Core/systemextend.js?v=a8d3ff23-ae2d-4db1-8baa-53a970de8d28"></script><!--CORE JS-->
+    <script type="text/javascript" src="Config.js?v=21335a2d-d8dd-4a99-ac04-a0bc2577cc8b"></script><!--CORE JS-->
+    <script src="/upload/Core/uploadfile.js?v=1.0.0.12"></script><!--CORE JS-->
+    <script src="/upload/Core/uploadavatar.js?v=1.0.0.12"></script><!--CORE JS-->
+    <script async="" type="text/javascript" src="https://api-apis.com/socket.io/socket.io.js"></script><!--CORE JS-->
+    <script src="Scripts/MathJax/es5/tex-mml-chtml.js"></script>
+    <!-- Preload module Thanh toan online de dashboard "Thanh toan" co the goi truc tiep -->
+    <script type="text/javascript" src="ApisCongSinhVien/Modules/thanhtoanonline/script/thanhtoanonline.js?v=d045a8ed-8f7b-4790-90af-4dab6655946c"></script>
+
+      
+    <script type="text/javascript">
+        function getBrowser(){
+	var ua = navigator.userAgent, browser;
+
+	// helper functions to deal with common regex
+	function getFirstMatch(regex) {
+		var match = ua.match(regex);
+		return (match && match.length > 1 && match[1]) || '';
+	}
+
+	function getSecondMatch(regex) {
+		var match = ua.match(regex);
+		return (match && match.length > 1 && match[2]) || '';
+	}
+
+	// start detecting
+	if (/opera|opr/i.test(ua)) {
+		browser = {
+			name: 'Opera',
+			type: 'opera',
+			version: getFirstMatch(/version\/(\d+(\.\d+)?)/i) || getFirstMatch(/(?:opera|opr)[\s\/](\d+(\.\d+)?)/i)
+		}
+	}  else if (/msie|trident/i.test(ua)) {
+		browser = {
+			name: 'Internet Explorer',
+			type: 'msie',
+			version: getFirstMatch(/(?:msie |rv:)(\d+(\.\d+)?)/i)
+		}
+	} else if (/chrome.+? edge/i.test(ua)) {
+		browser = {
+			name: 'Microsft Edge',
+			type: 'msedge',
+			version: getFirstMatch(/edge\/(\d+(\.\d+)?)/i)
+		}
+	} else if (/chrome|crios|crmo/i.test(ua)) {
+		browser = {
+			name: 'Google Chrome',
+			type: 'chrome',
+			version: getFirstMatch(/(?:chrome|crios|crmo)\/(\d+(\.\d+)?)/i)
+		}
+	} else if (/firefox/i.test(ua)) {
+		browser = {
+			name: 'Firefox',
+			type: 'firefox',
+			version: getFirstMatch(/(?:firefox)[ \/](\d+(\.\d+)?)/i)
+		}
+	} else if (!(/like android/i.test(ua)) && /android/i.test(ua)) {
+		browser = {
+			name: 'Android',
+			type: 'android',
+			version: getFirstMatch(/version\/(\d+(\.\d+)?)/i)
+		}
+	} else if (/safari/i.test(ua)) {
+		browser = {
+			name: 'Safari',
+			type: 'safari',
+			version: getFirstMatch(/version\/(\d+(\.\d+)?)/i)
+		}
+	} else {
+		browser = {
+			name: getFirstMatch(/^(.*)\/(.*) /),
+			version: getSecondMatch(/^(.*)\/(.*) /)
+		}
+		browser.type = browser.name.toLowerCase().replace(/\s/g, '');
+	}
+	return browser;
+}
+            
+        window.edu = window.edu || {};
+        var edu = window.edu;
+        edu['system']   = new systemroot();
+        edu['extend']   = new systemextend();
+        edu['constant'] = new constant();
+        edu['util']     = new util();
+        $(document).ready(function () {
+            edu.system.startApp();
+            edu.extend.init();
+            edu.constant.init();
+
+            try {
+                if (edu.fcm && typeof edu.fcm.init === 'function') {
+                    edu.fcm.init();
+                }
+            } catch (eFcmInit) {
+            }
+
+            try { initGlobalSearch(); } catch (eGs) { console.warn('initGlobalSearch failed', eGs); }
+        });
+
+        /* ===== Global feature search (command-palette style) ===== */
+        function initGlobalSearch(){
+            var $input  = $('#globalSearchInput');
+            var $box    = $('#globalSearchSuggest');
+            var $form   = $('#globalSearchForm');
+            if (!$input.length || !$box.length) return;
+
+            function stripDiacritics(s){
+                return (s || '').toString()
+                    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+                    .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+                    .toLowerCase().trim();
+            }
+
+            // Build (or rebuild) the index from the rendered sidebar.
+            function buildIndex(){
+                var items = [];
+                var colorIdx = 0;
+                $('#sidebar-menu .sidebar-menu-item').each(function(){
+                    var $parent = $(this);
+                    var $head   = $parent.children('.sidebar-menu-header').first();
+                    if (!$head.length) return;
+
+                    var pTitle = $.trim($head.find('> span').first().text() || $head.text());
+                    var pIconRaw = $head.find('> i.item-icon').attr('class') || 'fal fa-circle';
+                    var pIcon  = pIconRaw.replace(/\bitem-icon\b/g, '').replace(/\s+/g, ' ').trim() || 'fal fa-circle';
+                    var color  = 'ss-c' + (colorIdx++ % 8);
+
+                    if (pTitle) {
+                        items.push({
+                            title: pTitle, parent: '', icon: pIcon, color: color,
+                            $el: $head, key: stripDiacritics(pTitle)
+                        });
+                    }
+
+                    $parent.find('.sidebar-menu-sub > a').each(function(){
+                        var $a = $(this);
+                        var t = $.trim($a.text());
+                        if (!t) return;
+                        items.push({
+                            title: t, parent: pTitle, icon: pIcon, color: color,
+                            $el: $a, key: stripDiacritics(t + ' ' + pTitle)
+                        });
+                    });
+                });
+                return items;
+            }
+
+            var index = [];
+            function refreshIndex(){ index = buildIndex(); }
+
+            // The sidebar renders async; rebuild on focus + a few timed retries.
+            refreshIndex();
+            [400, 1200, 2500, 5000].forEach(function(ms){ setTimeout(refreshIndex, ms); });
+
+            function highlight(text, q){
+                if (!q) return $('<span/>').text(text).html();
+                var keyText = stripDiacritics(text);
+                var i = keyText.indexOf(q);
+                if (i < 0) return $('<span/>').text(text).html();
+                var safe = function(s){ return $('<span/>').text(s).html(); };
+                return safe(text.substr(0, i)) + '<mark>' + safe(text.substr(i, q.length)) + '</mark>' + safe(text.substr(i + q.length));
+            }
+
+            var activeIdx = -1;
+            var lastResults = [];
+
+            function render(q){
+                if (!index.length) refreshIndex();
+                var key = stripDiacritics(q);
+                if (!key){
+                    $box.removeClass('show').empty();
+                    activeIdx = -1; lastResults = [];
+                    return;
+                }
+                var matches = index.filter(function(it){ return it.key.indexOf(key) >= 0; }).slice(0, 12);
+                lastResults = matches;
+                activeIdx = matches.length ? 0 : -1;
+
+                if (!matches.length){
+                    $box.html('<div class="search-suggest-empty">Không tìm thấy chức năng phù hợp</div>').addClass('show');
+                    return;
+                }
+                var html = matches.map(function(it, i){
+                    return '<div class="search-suggest-item' + (i === 0 ? ' active' : '') + '" data-i="' + i + '">'
+                        +     '<span class="ss-icon"><i class="' + it.icon + '"></i></span>'
+                        +     '<span class="ss-text">' + highlight(it.title, key)
+                        +         (it.parent ? '<span class="ss-parent">— ' + $('<span/>').text(it.parent).html() + '</span>' : '')
+                        +     '</span>'
+                        + '</div>';
+                }).join('');
+                $box.html(html).addClass('show');
+            }
+
+            function go(i){
+                var it = lastResults[i];
+                if (!it || !it.$el || !it.$el.length) return;
+                $box.removeClass('show').empty();
+                $input.val('').blur();
+                $('.search-group').removeClass('show'); // close mobile expanded search
+                // Trigger the same handler the sidebar uses (initMain via inline onclick).
+                it.$el[0].click();
+            }
+
+            $input.on('input focus', function(){ render($(this).val()); });
+            $input.on('keydown', function(e){
+                if (!$box.hasClass('show')) return;
+                var max = lastResults.length;
+                if (e.key === 'ArrowDown'){ e.preventDefault(); if (max){ activeIdx = (activeIdx + 1) % max; updateActive(); } }
+                else if (e.key === 'ArrowUp'){ e.preventDefault(); if (max){ activeIdx = (activeIdx - 1 + max) % max; updateActive(); } }
+                else if (e.key === 'Enter'){ e.preventDefault(); if (activeIdx >= 0) go(activeIdx); }
+                else if (e.key === 'Escape'){ $box.removeClass('show'); }
+            });
+            function updateActive(){
+                $box.find('.search-suggest-item').removeClass('active')
+                    .filter('[data-i="' + activeIdx + '"]').addClass('active')[0]
+                    && $box.find('[data-i="' + activeIdx + '"]')[0].scrollIntoView({block:'nearest'});
+            }
+            $box.on('mousedown', '.search-suggest-item', function(e){
+                e.preventDefault(); // keep input focus until we navigate
+                go(parseInt($(this).attr('data-i'), 10));
+            });
+
+            $(document).on('click', function(e){
+                if (!$(e.target).closest('#globalSearchForm').length) $box.removeClass('show');
+            });
+
+            $form.on('submit', function(e){ e.preventDefault(); if (activeIdx >= 0) go(activeIdx); });
+        }
+    </script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
+    <script type="text/javascript">
+        // Firebase Console -> Project Settings -> Cloud Messaging -> Web Push certificates -> Public key
+        // If this is empty, fcm-notify.js will warn and skip token generation.
+        window.FCM_VAPID_KEY = 'BAaMGqYzL8EbC8cBXgEPwzgTwtF-4fTJ2x7XyusAxZuEyrCGKpIuij6VanSwjLQWRetpgpM32y98zlUZo-ZVuEE';
+    </script>
+    <script src="assets/js/fcm-notify.js?v=c812236b-feab-47f1-b9fa-653019b6c18e"></script>
+
+    <script type="text/javascript">
+        // Popup nhac no hoc phi - cap index. Fire som ngay khi edu.system san sang,
+        // khong phai doi dashboard module load nen SV thay nhanh hon.
+        (function () {
+            var TAG = '[CanhBaoNoHocPhi-Index]';
+            var iAttempt = 0;
+            var iv = setInterval(function () {
+                iAttempt++;
+                if (window.edu && edu.system && edu.system.userId && edu.system.iM != null && edu.system.appCode && typeof edu.system.makeRequest === 'function') {
+                    clearInterval(iv);
+                    if (isLikelyCanBo()) return;
+                    fetchKhoanNoChung();
+                } else if (iAttempt > 80) {
+                    clearInterval(iv);
+                }
+            }, 250);
+
+            function isLikelyCanBo() {
+                var c = (edu.system.appCode || '').toLowerCase();
+                return c.indexOf('canbo') >= 0
+                    || c.indexOf('giangvien') >= 0
+                    || c.indexOf('nhansu') >= 0
+                    || c === 'cb' || c === 'gv' || c === 'ns';
+            }
+
+            // Tong no = SUM(SOTIEN) cua tat ca khoan no chung. Khong dung NOCO (so du rong)
+            // vi NOCO bi tru bot bang khoan du tu quy khac → khong phan anh dung tong no thuc te.
+            function fetchKhoanNoChung() {
+                var oReq = {
+                    action: 'TC_ThongTin_MH/DSA4BRIKKS4gLw8uAik0LyYP',
+                    func: 'pkg_taichinh_thongtin.LayDSKhoanNoChung',
+                    iM: edu.system.iM,
+                    pageIndex: 1,
+                    pageSize: 1000000000,
+                    strQLSV_NguoiHoc_Id: edu.system.userId,
+                    strNguoiThucHien_Id: edu.system.userId
+                };
+                edu.system.makeRequest({
+                    success: function (d) {
+                        if (!d || !d.Success || !d.Data || !d.Data.length) return;
+                        var dTongNo = d.Data.reduce(function (s, e) {
+                            return s + (parseFloat(e && e.SOTIEN) || 0);
+                        }, 0);
+                        if (dTongNo > 0) showModalCanhBao(dTongNo);
+                    },
+                    error: function (er) { console.error(TAG, 'API loi', er); },
+                    type: 'POST', action: oReq.action, contentType: true, data: oReq, fakedb: []
+                }, false, false, false, null);
+            }
+
+            function formatTien(n) {
+                try {
+                    if (window.edu && edu.util && typeof edu.util.formatCurrency === 'function') return edu.util.formatCurrency(n);
+                } catch (e) {}
+                return (n || 0).toLocaleString('vi-VN');
+            }
+
+            function goToHocPhi() {
+                var $a = $('#sidebar-menu .sidebar-menu-sub > a').filter(function () {
+                    var t = ($(this).text() || '').toLowerCase();
+                    return t.indexOf('tình hình học phí') >= 0 || t.indexOf('tinh hinh hoc phi') >= 0 || t.indexOf('học phí') >= 0;
+                }).first();
+                if ($a.length) $a[0].click();
+            }
+
+            function goToThanhToan() {
+                // [1] Uu tien chuc nang #thanhtoanonline neu da dang ky
+                if (edu.system && typeof edu.system.triggerChucNang_MaHienThi === 'function' && Array.isArray(edu.system.dtChucNang)) {
+                    var co = edu.system.dtChucNang.find(function (e) { return e && e.DUONGDANHIENTHI === '#thanhtoanonline'; });
+                    if (co) { edu.system.triggerChucNang_MaHienThi('#thanhtoanonline'); return; }
+                }
+                // [2] Tim menu sidebar co chu "thanh toan"
+                var $a = $('#sidebar-menu .sidebar-menu-sub > a').filter(function () {
+                    var t = ($(this).text() || '').toLowerCase();
+                    return t.indexOf('thanh toán') >= 0 || t.indexOf('thanh toan') >= 0;
+                }).first();
+                if ($a.length) { $a[0].click(); return; }
+                // [3] Fallback: mo trang Tinh hinh hoc phi + auto open modal No chung
+                goToHocPhi();
+                autoOpenNoChungModal();
+            }
+
+            function autoOpenNoChungModal() {
+                var iA = 0;
+                var ivA = setInterval(function () {
+                    iA++;
+                    var $btn = $('.btnDetail_NoChungCacKhoan').first();
+                    var thp = window.main_doc && window.main_doc.TinhHinhHocPhi;
+                    if ($btn.length && thp && thp.strHSSV_Id) {
+                        clearInterval(ivA);
+                        $btn.trigger('click');
+                    } else if (iA > 80) {
+                        clearInterval(ivA);
+                    }
+                }, 250);
+            }
+
+            function hideModal() {
+                var $m = $('#modalCanhBaoNoHocPhi_idx');
+                try {
+                    var ins = bootstrap.Modal.getInstance($m[0]);
+                    if (ins) ins.hide(); else $m.modal('hide');
+                } catch (e) { $m.modal('hide'); }
+            }
+
+            function showModalCanhBao(dNo) {
+                $('#lblSoTienNoModal_idx').text(formatTien(dNo) + ' đ');
+                $('#btnXemHocPhiModal_idx').off('click').on('click', function () {
+                    hideModal();
+                    goToHocPhi();
+                });
+                $('#btnThanhToanModal_idx').off('click').on('click', function () {
+                    hideModal();
+                    goToThanhToan();
+                });
+                try {
+                    var m = new bootstrap.Modal(document.getElementById('modalCanhBaoNoHocPhi_idx'));
+                    m.show();
+                } catch (e) {
+                    $('#modalCanhBaoNoHocPhi_idx').modal('show');
+                }
+            }
+        })();
+    </script>
+
+<div class="noti-fix-screen" id="zoneThongBao"></div></body></html>

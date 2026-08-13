@@ -1,7 +1,7 @@
 {
   "name": "eaut-schedule-portal",
   "version": "1.0.0",
-  "description": "Web app lay lich hoc sinh vien tu cong sinhvien.eaut.edu.vn",
+  "description": "Web app lay lich hoc sinh vien tu cong qldt.eaut.edu.vn",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -15,6 +15,7 @@
     "dotenv": "^16.4.7",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
+    "puppeteer": "^25.1.0",
     "tough-cookie": "^4.1.4"
   }
 }

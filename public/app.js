@@ -149,3 +149,26 @@ if (dayFilterButtons.length) {
     button.addEventListener("click", () => setDayFilter(button.getAttribute("data-day-filter") || "all"));
   });
 }
+
+// Toggle Password Visibility
+const togglePasswordBtn = $("#togglePasswordBtn");
+const passwordInput = $("#password");
+
+if (togglePasswordBtn && passwordInput) {
+  togglePasswordBtn.addEventListener("click", () => {
+    const isPassword = passwordInput.getAttribute("type") === "password";
+    passwordInput.setAttribute("type", isPassword ? "text" : "password");
+
+    const eyeOff = togglePasswordBtn.querySelector(".eye-off");
+    const eyeOn = togglePasswordBtn.querySelector(".eye-on");
+
+    if (eyeOff && eyeOn) {
+      eyeOff.style.display = isPassword ? "none" : "block";
+      eyeOn.style.display = isPassword ? "block" : "none";
+    }
+
+    const newLabel = isPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu";
+    togglePasswordBtn.setAttribute("aria-label", newLabel);
+    togglePasswordBtn.setAttribute("title", newLabel);
+  });
+}

@@ -168,7 +168,7 @@
               <span class="nav-label">Lịch thi</span>
               <span class="nav-hint">Exams</span>
             </a>
-            <a class="nav-item" href="https://sinhvien.eaut.edu.vn/Login.aspx" target="_blank" rel="noreferrer" data-nav-item="link">
+            <a class="nav-item" href="https://qldt.eaut.edu.vn/congthongtin/login.aspx#diemhoc" target="_blank" rel="noreferrer" data-nav-item="link">
               <span class="nav-icon" aria-hidden="true">🔗</span>
               <span class="nav-label">Cổng EAUT</span>
               <span class="nav-hint">Link</span>
@@ -263,7 +263,19 @@
                     </div>
                     <div class="field">
                       <label for="password">Mật khẩu</label>
-                      <input id="password" name="password" type="password" autocomplete="current-password" required value="<%= formData.password %>" placeholder="Mật khẩu cổng EAUT" />
+                      <div class="password-wrapper">
+                        <input id="password" name="password" type="password" autocomplete="current-password" required value="<%= formData.password %>" placeholder="Mật khẩu cổng EAUT" />
+                        <button type="button" class="toggle-password-btn" id="togglePasswordBtn" aria-label="Hiện mật khẩu" title="Hiện mật khẩu">
+                          <svg class="eye-icon eye-off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                          </svg>
+                          <svg class="eye-icon eye-on" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                     <button type="submit" class="btn btn-primary">Đồng bộ lịch học</button>
                   </form>
@@ -563,15 +575,7 @@
                                       data-target-time="<%= day.date ? (day.date.split('/').reverse().join('-') + 'T' + start.padStart(5, '0')) : '' %>"
                                     >
                                       <div class="session-item__top" style="flex-direction: column; align-items: flex-start; gap: 2px; margin-bottom: 6px;">
-                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; gap: 6px;">
-                                          <div class="session-item__title" style="flex: 1; font-weight: 800; font-size: 0.85rem; line-height: 1.2; color: var(--text-main);"><%= item.course %></div>
-                                          <% if (item.time && item.time !== '-') { %>
-                                            <div class="tiet-badge" style="flex-shrink: 0; background: var(--accent); color: white; padding: 4px 6px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 40px;">
-                                              <span style="font-size: 0.55rem; font-weight: 800; text-transform: uppercase; line-height: 1; opacity: 0.9; margin-bottom: 2px;">Tiết</span>
-                                              <span style="font-size: 0.8rem; font-weight: 900; line-height: 1;"><%= item.time %></span>
-                                            </div>
-                                          <% } %>
-                                        </div>
+                                        <div class="session-item__title" style="font-weight: 800; font-size: 0.88rem; line-height: 1.25; color: var(--text-main); width: 100%;"><%= item.course %></div>
                                         <div class="countdown-tag" style="font-size: 0.65rem; font-weight: 700;" data-countdown-target></div>
                                       </div>
                                       
@@ -681,121 +685,113 @@
           </div>
           <% } else if (result.viewType === 'term') { %>
             <div class="term-view">
-              <div class="schedule-toolbar term-toolbar">
-                <form action="/schedule/term" method="get" class="week-form">
-                  <label for="selectedSemester">Học kỳ / Đợt học</label>
-                  <select id="selectedSemester" name="semester" onchange="this.form.submit()">
-                    <option value="all" <%= result.selectedSemester === 'all' ? "selected" : "" %>>-- Xem tất cả học kỳ --</option>
+              <!-- Compact & Clean Semester Toolbar -->
+              <div class="schedule-toolbar term-toolbar" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.6rem 1rem; border-radius: var(--radius-md); margin-bottom: 1.25rem;">
+                
+                <form action="/schedule/term" method="get" class="week-form" style="display: flex; align-items: center; gap: 0.6rem; flex: 1; min-width: 0; margin: 0;">
+                  <label for="selectedSemester" style="font-size: 0.8rem; font-weight: 800; color: var(--text-muted); white-space: nowrap; margin: 0; display: flex; align-items: center; gap: 0.35rem;">
+                    <span>🎓</span> Học kỳ:
+                  </label>
+                  <select id="selectedSemester" name="semester" onchange="this.form.submit()"
+                          style="flex: 1; max-width: 320px; font-size: 0.82rem; font-weight: 700; padding: 0.4rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface-solid); color: var(--text-main); cursor: pointer;">
                     <% (result.semesterOptions || []).forEach((opt) => { %>
-                      <% const isSelected = result.selectedSemester && result.selectedSemester !== 'all' ? opt.value === result.selectedSemester : opt.selected; %>
+                      <% const isSelected = result.selectedSemester ? (opt.value === result.selectedSemester || opt.label === result.selectedSemester) : opt.selected; %>
                       <option value="<%= opt.value %>" <%= isSelected ? "selected" : "" %>><%= opt.label %></option>
                     <% }) %>
                   </select>
                 </form>
+
+                <div style="display: flex; align-items: center; gap: 0.65rem; flex-shrink: 0;">
+                  <% if (result.fetchedAt) { %>
+                    <% const fetchDate = new Date(result.fetchedAt); %>
+                    <span style="font-size: 0.68rem; color: var(--text-dim); white-space: nowrap;">
+                      🕒 <%= fetchDate.toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'}) %> <%= fetchDate.toLocaleDateString('vi-VN') %>
+                    </span>
+                  <% } %>
+                  <a href="/schedule/term?semester=<%= result.selectedSemester || 'all' %>&refresh=1"
+                     class="btn btn-ghost btn-sm"
+                     style="display: flex; align-items: center; gap: 0.3rem; text-decoration: none; font-size: 0.75rem; font-weight: 700; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.35rem 0.65rem; color: var(--text-muted); transition: all var(--transition);"
+                     title="Làm mới dữ liệu từ trường">
+                    🔄 Làm mới
+                  </a>
+                </div>
+
               </div>
 
-              <% (result.results || []).reverse().forEach(semResult => { %>
+              <% if (!result.results || result.results.length === 0 || result.results.every(r => r.rows.length === 0)) { %>
+                <div class="alert alert-info" style="margin-top: 2rem;">
+                  Đã đăng nhập thành công nhưng không tìm thấy dữ liệu lịch học trong học kỳ này.
+                  Bạn hãy thử chọn một học kỳ khác hoặc chọn <strong>"Xem tất cả học kỳ"</strong>.
+                </div>
+              <% } %>
+
+              <% (result.results || []).reverse().forEach((semResult, semIndex) => { %>
                 <%
                   const grouped = new Map();
                   semResult.rows.forEach(row => {
                     let id = "", name = "", className = "", credits = "", fee = "", teacher = "", sched = "", room = "";
 
-                    row.forEach(cell => {
-                      const text = (cell || "").trim();
-                      if (!text || text === "-" || text === "0" || norm(text) === "dang cap nhat") return;
-
-                      const lower = norm(text);
-
-                      // Bỏ qua các loại đăng ký và ca học gây nhiễu
-                      if (lower.includes("hoc binh thuong") || lower.includes("hoc lai") || lower.includes("hoc cai thien")) return;
-                      
-                      const shiftParts = lower.split(" | ").map(x => x.trim());
-                      if (shiftParts.length > 0 && shiftParts.every(x => ["sang", "chieu", "toi", "ca 1", "ca 2", "ca 3", "ca 4"].includes(x))) return;
-
-                      if (/^\d{1,3}([,.]\d{3})+$/.test(text)) {
-                        fee = text;
-                      }
-                      else if (/\d{2}\/\d{2}\/\d{2,4}/.test(text) || lower.includes("thu ") || lower.includes("tiet ")) {
-                        sched = sched ? sched + " | " + text : text;
-                      }
-                      else if (/toa nha|building|eaut|phong|tầng|tang/i.test(lower) || /^[A-Z]\d{2,3}$/.test(text)) {
-                        room = text;
-                      }
-                      else if (text.includes(" - ") && /[A-Z0-9._]{5,}/.test(text)) {
-                        const parts = text.split(" - ");
-                        if (!name) name = parts[0].trim();
-                        className = parts.slice(1).join(" - ").trim();
-                        if (!id) id = className.split(".")[0] || className;
-                      }
-                      else if (/^[A-Z]{2,6}\d{3,6}$/i.test(text)) {
-                        id = text;
-                      }
-                      else if (/(?:^[A-ZĐ0-9]{2,10}\.\d+)|(?:^[A-ZĐ0-9_.]+(?:_LT|_TH|LT|TH)$)/i.test(text)) {
-                        className = text;
-                      }
-                      else if (/^\d{1,2}$/.test(text) && !credits && !fee) {
-                        credits = text;
-                      }
-                      else if (!name && text.length > 3 && !lower.includes("tong so") && !/^\d+$/.test(text)) {
-                        name = text;
-                      }
-                      else if (name && !teacher && text.length > 5 && !/\d/.test(text)) {
-                        teacher = text;
-                      }
-                    });
+                    if (row && typeof row === "object" && !Array.isArray(row)) {
+                      id = row.id || "";
+                      name = row.name || "";
+                      className = row.className || "";
+                      credits = row.credits || "";
+                      fee = row.fee || "";
+                      teacher = row.teacher || "";
+                      sched = row.sched || "";
+                      room = row.room || "";
+                    } else if (Array.isArray(row)) {
+                      row.forEach(cell => {
+                        let text = (cell || "").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]*>/g, "").replace(/\s*Có mặt\s*/gi, "").replace(/\s+/g, " ").trim();
+                        if (!text || text === "-" || text === "0" || norm(text) === "dang cap nhat") return;
+                        const lower = norm(text);
+                        if (lower.includes("hoc binh thuong") || lower.includes("hoc lai") || lower.includes("hoc cai thien")) return;
+                        const shiftParts = lower.split(" | ").map(x => x.trim());
+                        if (shiftParts.length > 0 && shiftParts.every(x => ["sang", "chieu", "toi", "ca 1", "ca 2", "ca 3", "ca 4"].includes(x))) return;
+                        if (/^\d{1,3}([,.]\d{3})+$/.test(text)) { fee = text; }
+                        else if (/\d{2}\/\d{2}\/\d{2,4}/.test(text) || lower.includes("thu ") || lower.includes("tiet ")) { sched = sched ? sched + " | " + text : text; }
+                        else if (/toa nha|building|eaut|phong|tầng|tang/i.test(lower) || /^[A-Z]\d{2,3}$/.test(text)) { room = text; }
+                        else if (text.includes(" - ") && /[A-Z0-9._]{5,}/.test(text)) {
+                          const parts = text.split(" - ");
+                          if (!name) name = parts[0].trim();
+                          className = parts.slice(1).join(" - ").trim();
+                          if (!id) id = className.split(".")[0] || className;
+                        }
+                        else if (/^[A-Z]{2,6}\d{3,6}$/i.test(text)) { id = text; }
+                        else if (/(?:^[A-ZĐ0-9]{2,10}\.\d+)|(?:^[A-ZĐ0-9_.]+(?:_LT|_TH|LT|TH)$)/i.test(text)) { className = text; }
+                        else if (/^\d{1,2}$/.test(text) && !credits && !fee) { credits = text; }
+                        else if (!name && text.length > 3 && !lower.includes("tong so") && !/^\d+$/.test(text)) { name = text; }
+                        else if (name && !teacher && text.length > 5 && !/\d/.test(text)) { teacher = text; }
+                      });
+                    }
 
                     if (!name) name = id || className || "Môn học";
                     if (!id) id = className || "N/A";
                     if (!className) className = "Chưa có lớp";
                     if (!teacher) teacher = "Đang cập nhật";
                     if (!room) room = "Đang cập nhật";
-
                     if (name === "Tổng số" || name === "Môn học") return;
 
                     const hasValidFee = !!fee;
-                    const key = deduplicate(name).toLowerCase(); // Group by Tên học phần
-
+                    const key = deduplicate(name).toLowerCase();
                     let item;
                     if (!grouped.has(key)) {
-                      item = {
-                        id, 
-                        name: deduplicate(name), 
-                        className: deduplicate(className), 
-                        credits,
-                        teacher: deduplicate(teacher),
-                        room: deduplicate(room),
-                        schedules: [],
-                        hasValidFee
-                      };
+                      item = { id, name: deduplicate(name), className: deduplicate(className), credits, teacher: deduplicate(teacher), room: deduplicate(room), schedules: [], hasValidFee };
                       grouped.set(key, item);
                     } else {
                       item = grouped.get(key);
-                      // Ưu tiên dòng có giá tiền (thường là học thuyết)
                       if (hasValidFee && !item.hasValidFee) {
-                        item.id = id;
-                        item.className = deduplicate(className);
-                        item.credits = credits;
-                        item.teacher = deduplicate(teacher);
-                        item.room = deduplicate(room);
-                        item.schedules = []; // Đặt lại lịch vì thay thế lớp
-                        item.hasValidFee = true;
+                        item.id = id; item.className = deduplicate(className); item.credits = credits;
+                        item.teacher = deduplicate(teacher); item.room = deduplicate(room);
+                        item.schedules = []; item.hasValidFee = true;
                       } else if (!hasValidFee && item.hasValidFee) {
-                        // Nếu dòng này không có phí mà dòng kia có:
-                        // Nếu TRÙNG LỚP, nghĩa là dòng này là dòng lịch thực hành, KHÔNG SKIP.
-                        // Nếu KHÁC LỚP, skip.
-                        if (item.className !== deduplicate(className)) {
-                          return;
-                        }
-                      } else if (item.className !== deduplicate(className)) {
-                        return; // Cùng trạng thái fee nhưng khác lớp -> skip
-                      }
+                        if (item.className !== deduplicate(className)) return;
+                      } else if (item.className !== deduplicate(className)) { return; }
                     }
 
                     const sText = deduplicate(sched);
                     const rText = item.room;
-                    
-                    const isElearning = (!rText || rText === "Đang cập nhật" || rText === "-" || rText === "0") &&
-                                        (!sText || sText === "-" || sText === "0");
+                    const isElearning = (!rText || rText === "Đang cập nhật" || rText === "-" || rText === "0") && (!sText || sText === "-" || sText === "0");
 
                     let fullSched = "";
                     if (isElearning) {
@@ -803,101 +799,139 @@
                     } else {
                       let dates = sText.match(/\d{2}\/\d{2}\/\d{2,4}/g) || [];
                       if (dates.length >= 2) {
-                        let parsed = dates.map(d => {
-                          let [D, M, Y] = d.split("/");
-                          if (Y.length === 2) Y = "20" + Y;
-                          return new Date(`${Y}-${M}-${D}`).getTime();
-                        }).filter(n => !isNaN(n));
-                        
+                        let parsed = dates.map(d => { let [D, M, Y] = d.split("/"); if (Y.length === 2) Y = "20" + Y; return new Date(`${Y}-${M}-${D}`).getTime(); }).filter(n => !isNaN(n));
                         if (parsed.length > 0) {
-                          let minDate = new Date(Math.min(...parsed));
-                          let maxDate = new Date(Math.max(...parsed));
-                          
-                          let fMin = `${String(minDate.getDate()).padStart(2, '0')}/${String(minDate.getMonth()+1).padStart(2, '0')}/${String(minDate.getFullYear()).slice(-2)}`;
-                          let fMax = `${String(maxDate.getDate()).padStart(2, '0')}/${String(maxDate.getMonth()+1).padStart(2, '0')}/${String(maxDate.getFullYear()).slice(-2)}`;
-                          
-                          fullSched = `Từ ${fMin} đến ${fMax}`;
-                        } else {
-                          fullSched = sText ? sText.split(" | ")[0] : "Chưa có lịch";
-                        }
+                          let minDate = new Date(Math.min(...parsed)); let maxDate = new Date(Math.max(...parsed));
+                          let fMin = `${String(minDate.getDate()).padStart(2,'0')}/${String(minDate.getMonth()+1).padStart(2,'0')}/${String(minDate.getFullYear()).slice(-2)}`;
+                          let fMax = `${String(maxDate.getDate()).padStart(2,'0')}/${String(maxDate.getMonth()+1).padStart(2,'0')}/${String(maxDate.getFullYear()).slice(-2)}`;
+                          fullSched = `${fMin} → ${fMax}`;
+                        } else { fullSched = sText ? sText.split(" | ")[0] : "Chưa có lịch"; }
                       } else if (dates.length === 1) {
-                        fullSched = `Bắt đầu từ ${dates[0]}`;
+                        fullSched = `Bắt đầu ${dates[0]}`;
                       } else {
                         fullSched = sText ? sText.split(" | ")[0] : "Chưa có lịch";
                       }
                     }
-
-                    if (fullSched && !item.schedules.includes(fullSched)) {
-                      item.schedules.push(fullSched);
-                    }
+                    if (fullSched && !item.schedules.includes(fullSched)) { item.schedules.push(fullSched); }
                   });
                 %>
-                <div class="list-day-header" style="margin-top: 2rem; border-color: var(--primary); display: flex; justify-content: space-between; align-items: flex-end;">
-                  <h3><%= semResult.semester %></h3>
-                  <div class="count-badge" style="margin-bottom: 0.5rem;">Tổng số tín chỉ: <strong><%= [...grouped.values()].reduce((acc, curr) => acc + (parseFloat(curr.credits) || 0), 0) %></strong></div>
-                </div>
-                <div class="term-grid">
-                  <% for (const item of grouped.values()) { %>
-                    <% const termCardStyle = `style="--accent: ${accentFromText(item.name)};"`; %>
-                    <div class="term-card" <%- termCardStyle %>>
-                      <div class="term-card__header">
-                        <div class="course-badge" style="background: var(--accent); color: white;"><%= item.id.substring(0, 2) %></div>
-                        <div class="course-code"><%= item.id %> · <%= item.credits %> tín</div>
+
+                <% if (grouped.size > 0) { %>
+                  <!-- Semester Header -->
+                  <% const semHeaderStyle = `style="margin-top: ${semIndex === 0 ? '0' : '2.5rem'}; padding-bottom: 0.6rem; border-bottom: 2px solid var(--primary); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;"`; %>
+                  <div <%- semHeaderStyle %>>
+                    <div>
+                      <h2 style="margin: 0; font-size: 1.1rem; font-weight: 900; color: var(--primary);"><%= semResult.semester %></h2>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                      <div style="font-size: 0.75rem; color: var(--text-dim); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.25rem 0.75rem;">
+                        📚 <strong style="color: var(--text-main);"><%= grouped.size %></strong> môn
                       </div>
-                      
-                      <h3><%= item.name %></h3>
-                      
-                      <div class="term-meta" style="display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.6rem;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem;">
-                          <span style="flex: 0 0 16px; text-align: center; opacity: 0.8;">🏷️</span>
-                          <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            Lớp: <strong style="color: var(--text-main);"><%= item.className %></strong>
+                      <div style="font-size: 0.75rem; color: var(--text-dim); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.25rem 0.75rem;">
+                        🎓 <strong style="color: var(--primary);"><%= [...grouped.values()].reduce((acc, curr) => acc + (parseFloat(curr.credits) || 0), 0) %></strong> tín chỉ
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Course Cards Grid -->
+                  <div class="term-grid" style="margin-top: 1rem;">
+                    <% let cardIndex = 0; for (const item of grouped.values()) { cardIndex++; %>
+                      <%
+                        const cleanField = (str) => String(str || "")
+                          .replace(/<br\s*\/?>/gi, " ").replace(/&lt;br\s*\/?&gt;/gi, " ")
+                          .replace(/<[^>]*>/g, "").replace(/&lt;[^&]*&gt;/gi, "")
+                          .replace(/\s*Có mặt\s*/gi, "").replace(/\s+/g, " ").trim();
+
+                        const nameWords = cleanField(item.name).split(" ").filter(Boolean);
+                        const badgeText = nameWords.length >= 2
+                          ? (nameWords[0][0] + nameWords[1][0]).toUpperCase()
+                          : cleanField(item.name).substring(0, 2).toUpperCase();
+                        const accentColor = accentFromText(item.name);
+                        const cleanClass = cleanField(item.className || item.id);
+                        const subjectName = cleanField(item.name);
+                        const headerClassCode = cleanClass.replace(subjectName, '').replace(/^[\s\-_.]+/, '').trim();
+
+                        // Determine room display
+                        let roomDisplay = item.schedules.some(s => s.includes('E-learning')) && item.room === 'Đang cập nhật' ? 'E-learning' : cleanField(item.room);
+
+                        // Schedule display
+                        const hasNoSched = item.schedules.length === 0 || (item.schedules.length === 1 && item.schedules[0] === "Chưa có lịch");
+                        const cardStyle = `style="--accent: ${accentColor}; animation: slideUp 0.5s cubic-bezier(0.23,1,0.32,1) backwards; animation-delay: ${cardIndex * 0.04}s;"`;
+                        const badgeStyle = `style="background: ${accentColor}; color: #fff; font-size: 0.7rem; padding: 0.25rem 0.6rem; border-radius: 6px; font-weight: 900; flex-shrink: 0; min-width: 32px; text-align: center;"`;
+                      %>
+                      <div class="term-card" <%- cardStyle %>>
+
+                        <!-- Card Header: Badge + Class code (without subject name) -->
+                        <div class="term-card__header">
+                          <div class="course-badge" <%- badgeStyle %>>
+                            <%= badgeText %>
+                          </div>
+                          <div style="flex: 1; min-width: 0; text-align: right; font-size: 0.65rem; color: var(--text-dim); font-weight: 700; line-height: 1.3; word-break: break-all; padding-left: 0.4rem;">
+                            <% if (headerClassCode) { %>
+                              <span style="color: var(--text-muted);"><%= headerClassCode %></span>
+                              <span style="color: var(--text-dim);"> · </span>
+                            <% } %>
+                            <span style="color: var(--primary); font-weight: 900;"><%= item.credits %> tín</span>
                           </div>
                         </div>
-                        <div style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.75rem;">
-                          <span style="flex: 0 0 16px; text-align: center; opacity: 0.8; margin-top: 1px;">👤</span>
-                          <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4;">
-                            GV: <strong style="color: var(--text-main);"><%= item.teacher %></strong>
+
+                        <!-- Subject name -->
+                        <h3 style="margin: 0; font-size: 0.88rem; font-weight: 900; color: var(--text-main); line-height: 1.35; word-break: break-word; overflow-wrap: break-word;"><%= cleanField(item.name) %></h3>
+
+                        <!-- Meta info -->
+                        <div style="display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.2rem;">
+
+                          <!-- Class -->
+                          <div style="display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.72rem;">
+                            <span style="flex-shrink: 0; opacity: 0.7; margin-top: 1px;">🏷️</span>
+                            <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4; word-break: break-all; overflow-wrap: break-word;">
+                              Lớp: <strong style="color: var(--text-main);"><%= cleanClass %></strong>
+                            </div>
                           </div>
-                        </div>
-                        <div style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.75rem;">
-                          <span style="flex: 0 0 16px; text-align: center; opacity: 0.8; margin-top: 1px;">📍</span>
-                          <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4; display: flex; align-items: flex-start; gap: 4px;">
-                            <span style="white-space: nowrap;">Phòng:</span>
-                            <div style="color: var(--text-main); flex: 1; display: flex; flex-direction: column; font-weight: bold;">
-                              <% 
-                                let rText = item.schedules.some(s => s.includes('E-learning')) && item.room === 'Đang cập nhật' ? 'E-learning' : item.room;
-                                let rList = rText.split(' | ');
-                              %>
-                              <% rList.forEach((r) => { %>
-                                <span><%= r %></span>
-                              <% }) %>
+
+                          <!-- Teacher -->
+                          <div style="display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.72rem;">
+                            <span style="flex-shrink: 0; opacity: 0.7; margin-top: 1px;">👤</span>
+                            <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4; word-break: break-word;">
+                              GV: <strong style="color: var(--text-main);"><%= cleanField(item.teacher) %></strong>
+                            </div>
+                          </div>
+
+                          <!-- Room -->
+                          <div style="display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.72rem;">
+                            <span style="flex-shrink: 0; opacity: 0.7; margin-top: 1px;">📍</span>
+                            <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4; word-break: break-word;">
+                              Phòng: <strong style="color: var(--text-main);"><%= roomDisplay %></strong>
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div class="term-schedule" style="margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--line);">
-                        <div style="display: flex; align-items: flex-start; gap: 0.4rem; color: var(--primary);">
-                          <span style="font-size: 0.75rem;">📅</span>
-                          <div style="font-size: 0.7rem; line-height: 1.4; font-weight: 700;">
-                            <% item.schedules.forEach(s => { %>
-                              <div>• <%= s.replace('Từ ', '').replace('đến ', '→ ') %></div>
-                            <% }) %>
-                          </div>
+                        <!-- Schedule footer -->
+                        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--line);">
+                          <% if (hasNoSched) { %>
+                            <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.68rem; color: var(--text-dim); font-style: italic;">
+                              <span>📅</span> Chưa có lịch cụ thể
+                            </div>
+                          <% } else { %>
+                            <div style="display: flex; align-items: flex-start; gap: 0.4rem; color: var(--primary);">
+                              <span style="font-size: 0.72rem; flex-shrink: 0; margin-top: 1px;">📅</span>
+                              <div style="font-size: 0.7rem; line-height: 1.5; font-weight: 700; word-break: break-word; flex: 1; min-width: 0;">
+                                <% item.schedules.forEach(s => { %>
+                                  <div>• <%= s %></div>
+                                <% }) %>
+                              </div>
+                            </div>
+                          <% } %>
                         </div>
+
                       </div>
-                    </div>
-                  <% } %>
-                </div>
+                    <% } %>
+                  </div>
+                <% } %>
               <% }) %>
-              <% if (!result.results || result.results.length === 0 || result.results.every(r => r.rows.length === 0)) { %>
-                <div class="alert alert-info" style="margin-top: 2rem;">
-                  Đã đăng nhập thành công nhưng không tìm thấy dữ liệu lịch học trong học kỳ này. 
-                  Bạn hãy thử chọn một học kỳ khác hoặc chọn "Xem tất cả học kỳ".
-                </div>
-              <% } %>
+
             </div>
+
           <% } else if (result.viewType === 'exam') { %>
             <%
               // Consolidate data grouping and sorting for exam view
@@ -905,7 +939,7 @@
               (result.results || []).forEach(r => {
                 (r.rows || []).forEach(row => {
                   if (row.length < 5) return;
-                  const semName = row[0] || "Học kỳ";
+                  const semName = row[0] || "Học kỳ hiện tại";
                   if (!examSemesters[semName]) examSemesters[semName] = [];
                   examSemesters[semName].push(row);
                 });
@@ -913,6 +947,7 @@
 
               const sortedSemNames = Object.keys(examSemesters).sort((a, b) => {
                 const getScore = (s) => {
+                  if (s === 'Khác') return -1; // Always at the bottom
                   const nums = s.match(/\d+/g) || [];
                   if (nums.length >= 2) {
                     const year = parseInt(nums[1]);
@@ -924,88 +959,140 @@
                 return getScore(b) - getScore(a);
               });
             %>
-            <div class="result-header" style="margin-bottom: 2rem;">
-              <div>
-                <h2>Lịch thi cử</h2>
-                <p class="muted">Cập nhật: <%= result.fetchedAt %></p>
+            <div class="term-view">
+              <!-- Compact & Clean Exam Toolbar -->
+              <div class="schedule-toolbar term-toolbar" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.6rem 1rem; border-radius: var(--radius-md); margin-bottom: 1.25rem;">
+                
+                <form action="/schedule/exam" method="get" class="week-form" style="display: flex; align-items: center; gap: 0.6rem; flex: 1; min-width: 0; margin: 0;">
+                  <label for="selectedSemester" style="font-size: 0.8rem; font-weight: 800; color: var(--text-muted); white-space: nowrap; margin: 0; display: flex; align-items: center; gap: 0.35rem;">
+                    <span>🧸</span> Học kỳ:
+                  </label>
+                  <select id="selectedSemester" name="semester" onchange="this.form.submit()"
+                          style="flex: 1; max-width: 280px; font-size: 0.82rem; font-weight: 700; padding: 0.4rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface-solid); color: var(--text-main); cursor: pointer;">
+                    <% (result.semesterOptions || []).forEach((opt) => { %>
+                      <% const isSelected = result.selectedSemester ? (opt.value === result.selectedSemester || opt.label === result.selectedSemester) : opt.selected; %>
+                      <option value="<%= opt.value %>" <%= isSelected ? "selected" : "" %>><%= opt.label %></option>
+                    <% }) %>
+                  </select>
+
+                  <div style="position: relative; flex: 1; max-width: 240px; margin-left: 0.5rem;">
+                    <input id="examFilter" type="text" placeholder="🔍 Lọc môn / phòng / SBD..."
+                           style="width: 100%; font-size: 0.8rem; padding: 0.4rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface-solid); color: var(--text-main);" />
+                  </div>
+                </form>
+
+                <div style="display: flex; align-items: center; gap: 0.65rem; flex-shrink: 0;">
+                  <% if (result.fetchedAt) { %>
+                    <% const fetchDate = new Date(result.fetchedAt); %>
+                    <span style="font-size: 0.68rem; color: var(--text-dim); white-space: nowrap;">
+                      🕒 <%= fetchDate.toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'}) %> <%= fetchDate.toLocaleDateString('vi-VN') %>
+                    </span>
+                  <% } %>
+                  <a href="/schedule/exam?semester=<%= result.selectedSemester || 'all' %>&refresh=1"
+                     class="btn btn-ghost btn-sm"
+                     style="display: flex; align-items: center; gap: 0.3rem; text-decoration: none; font-size: 0.75rem; font-weight: 700; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.35rem 0.65rem; color: var(--text-muted); transition: all var(--transition);"
+                     title="Làm mới lịch thi">
+                    🔄 Làm mới
+                  </a>
+                </div>
+
               </div>
-            </div>
 
-            <div class="schedule-toolbar weekly-toolbar">
-              <div class="toolbar-group" style="flex:1; min-width: 200px;">
-                <label for="examFilter">Lọc nhanh</label>
-                <input id="examFilter" type="text" placeholder="Môn / Phòng / SBD..." style="width: 100%;" />
+              <div class="term-layout">
+                <% sortedSemNames.forEach((semName, semIdx) => { %>
+                  <% const semIdxHeaderStyle = `style="margin-top: ${semIdx === 0 ? '0' : '2.5rem'}; padding-bottom: 0.6rem; border-bottom: 2px solid var(--primary); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;"`; %>
+                  <div <%- semIdxHeaderStyle %>>
+                    <h2 style="margin: 0; font-size: 1.1rem; font-weight: 900; color: var(--primary);"><%= semName %></h2>
+                    <span style="font-size: 0.75rem; color: var(--text-dim); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.25rem 0.75rem;">
+                      📝 Tổng: <strong style="color: var(--text-main);"><%= examSemesters[semName].length %></strong> môn thi
+                    </span>
+                  </div>
+
+                  <div class="term-grid" style="margin-top: 1rem;">
+                    <% examSemesters[semName].forEach((row, index) => {
+                         const subject = row[1] || "-";
+                         const attempt = row[2] && row[2] !== "-" ? row[2] : "1";
+                         const phase = row[3] && row[3] !== "-" ? row[3] : "-";
+                         const date = row[4] || "-";
+                         const shift = row[5] || "-";
+                         const time = row[6] || "-";
+                         const room = row[7] || "-";
+                         const sbd = row[8] || "-";
+                         let format = row[9] || "Thi kết thúc HP";
+                         if (format === "-") format = "Thi kết thúc HP";
+
+                         // Robust date-time ISO string parsing for target countdown
+                         let targetTimeISO = "";
+                         if (date && date !== "-") {
+                           const parts = date.split('/');
+                           if (parts.length === 3) {
+                             const yyyy = parts[2].length === 2 ? "20" + parts[2] : parts[2];
+                             const mm = parts[1].padStart(2, '0');
+                             const dd = parts[0].padStart(2, '0');
+                             const isoDate = `${yyyy}-${mm}-${dd}`;
+
+                             const tStartRaw = (time || "").split("-")[0].replace(/h/gi, ":").trim();
+                             if (tStartRaw && tStartRaw !== "-") {
+                               const [hStr, mStr] = tStartRaw.split(":");
+                               const hh = String(parseInt(hStr) || 0).padStart(2, '0');
+                               const mmVal = String(parseInt(mStr) || 0).padStart(2, '0');
+                               targetTimeISO = `${isoDate}T${hh}:${mmVal}:00`;
+                             } else {
+                               targetTimeISO = `${isoDate}T08:00:00`;
+                             }
+                           }
+                         }
+                    %>
+                      <% const accentColor = accentFromText(subject); %>
+                      <% const examStyle = `style="--accent: ${accentColor}; display: flex; flex-direction: column; animation: slideUp 0.5s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: ${index * 0.04}s;"`; %>
+                      <div
+                        class="term-card exam-item"
+                        <%- examStyle %>
+                        data-search-content="<%= [subject, room, sbd, date, format].join(' ').toLowerCase() %>"
+                        data-target-time="<%= targetTimeISO %>"
+                      >
+                        <div class="term-card-header" style="margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                          <span class="course-badge" style="background: <%= accentColor %>; color: white; padding: 0.2rem 0.55rem; font-size: 0.62rem; border-radius: 6px; font-weight: 900; line-height: 1.2; text-transform: uppercase;">
+                            <%= format %>
+                          </span>
+                        </div>
+                        
+                        <h3 style="margin: 0; font-size: 0.88rem; font-weight: 900; color: var(--text-main); line-height: 1.35; word-break: break-word; overflow-wrap: break-word;"><%= subject %></h3>
+                        
+                        <div class="exam-meta-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.6rem; margin-top: 0.5rem; border-top: 1px solid var(--line); padding-top: 0.45rem;">
+                          <div style="display: flex; align-items: center; gap: 4px; font-size: 0.72rem;">
+                            <span style="opacity: 0.7; flex-shrink: 0;">📍</span>
+                            <span style="color: var(--text-muted); min-width: 0; word-break: break-all;">Phòng: <strong style="color: var(--text-main);"><%= room %></strong></span>
+                          </div>
+                          <div style="display: flex; align-items: center; gap: 4px; font-size: 0.72rem;">
+                            <span style="opacity: 0.7; flex-shrink: 0;">🏷️</span>
+                            <span style="color: var(--text-muted); min-width: 0;">SBD: <strong style="color: var(--primary); font-weight: 900;"><%= sbd %></strong></span>
+                          </div>
+                          <div style="display: flex; align-items: center; gap: 4px; font-size: 0.72rem;">
+                            <span style="opacity: 0.7; flex-shrink: 0;">📅</span>
+                            <span style="color: var(--text-muted); min-width: 0;">Ngày: <strong style="color: var(--text-main);"><%= date %></strong></span>
+                          </div>
+                          <div style="display: flex; align-items: center; gap: 4px; font-size: 0.72rem;">
+                            <span style="opacity: 0.7; flex-shrink: 0;">🕒</span>
+                            <span style="color: var(--text-muted); min-width: 0;">Giờ: <strong style="color: var(--text-main);"><%= time %><% if (shift && shift !== '-') { %> (<%= shift %>)<% } %></strong></span>
+                          </div>
+                        </div>
+                        
+                        <div class="term-schedule" style="margin-top: auto; padding: 0.4rem 0.5rem; border-top: 1px dashed var(--line); margin-top: 0.5rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.68rem; font-weight: 700; color: var(--text-dim);">
+                          <span>Lần <%= attempt %><% if (phase && phase !== '-') { %> · Đợt <%= phase %><% } %></span>
+                          <div class="countdown-tag" style="font-size: 0.65rem; font-weight: 800;" data-countdown-target></div>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                <% }) %>
+
+                <% if (sortedSemNames.length === 0) { %>
+                  <div class="alert alert-info" style="margin-top: 2rem;">
+                    Đã đăng nhập thành công nhưng không tìm thấy dữ liệu lịch thi nào.
+                  </div>
+                <% } %>
               </div>
-            </div>
-
-            <div class="term-layout">
-              <% sortedSemNames.forEach(semName => { %>
-                <div class="list-day-header" style="margin-top: 2.5rem; border-bottom: 2px solid var(--primary); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: flex-end;">
-                  <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--text);"><%= semName %></h3>
-                  <span class="muted" style="font-size: 0.8rem;">Tổng: <strong><%= examSemesters[semName].length %></strong> môn</span>
-                </div>
-
-                <div class="term-grid" style="margin-top: 1rem;">
-                  <% examSemesters[semName].forEach((row, index) => {
-                       const subject = row[1] || "-";
-                       const attempt = row[2] || "-";
-                       const phase = row[3] || "-";
-                       const date = row[4] || "-";
-                       const shift = row[5] || "-";
-                       const time = row[6] || "-";
-                       const room = row[7] || "-";
-                       const sbd = row[8] || "-";
-                       const format = row[9] || "-";
-                  %>
-                    <% const examStyle = `style="--accent: ${accentFromText(subject)}; display: flex; flex-direction: column; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: ${index * 0.05}s;"`; %>
-                    <div
-                      class="term-card exam-item"
-                      <%- examStyle %>
-                      data-search-content="<%= [subject, room, sbd, date, format].join(' ').toLowerCase() %>"
-                      data-target-time="<%= date ? (date.split('/').reverse().join('-') + 'T' + time.replace('h', ':').padStart(5, '0')) : '' %>"
-                    >
-                      <div class="term-card-header" style="margin-bottom: 0.6rem;">
-                        <span class="course-badge" style="background: var(--accent); color: white; padding: 0.15rem 0.5rem; font-size: 0.6rem; border-radius: 4px; font-weight: 800; line-height: 1.2;">
-                          <%= format %>
-                        </span>
-                      </div>
-                      
-                      <h3 style="font-size: 0.85rem; font-weight: 800; color: var(--text-main); line-height: 1.2;"><%= subject %></h3>
-                      
-                      <div class="exam-meta-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem; border-top: 1px solid var(--line); padding-top: 0.4rem;">
-                        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
-                          <span style="opacity: 0.7;">📍</span>
-                          <span style="color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Phòng: <strong><%= room %></strong></span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
-                          <span style="opacity: 0.7;">🏷️</span>
-                          <span style="color: var(--text-muted);">SBD: <strong style="color: var(--accent);"><%= sbd %></strong></span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
-                          <span style="opacity: 0.7;">📅</span>
-                          <span style="color: var(--text-muted);">Ngày: <strong><%= date %></strong></span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
-                          <span style="opacity: 0.7;">🕒</span>
-                          <span style="color: var(--text-muted);">Giờ: <strong><%= time %> (<%= shift %>)</strong></span>
-                        </div>
-                      </div>
-                      
-                      <div class="term-schedule" style="margin-top: auto; padding: 0.5rem; border-top: 1px dashed var(--line); margin-top: 0.6rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; align-items: center; font-size: 0.6rem; font-weight: 700; color: var(--text-dim); text-align: center;">
-                        <span style="border-right: 1px solid var(--line); padding-right: 4px;">Lần <%= attempt %></span>
-                        <span style="border-right: 1px solid var(--line); padding-right: 4px;">Đợt <%= phase %></span>
-                        <div class="countdown-tag" style="font-size: 0.58rem; color: var(--accent);" data-countdown-target></div>
-                      </div>
-                    </div>
-                  <% }) %>
-                </div>
-              <% }) %>
-
-              <% if (sortedSemNames.length === 0) { %>
-                <div class="alert alert-info" style="margin-top: 2rem;">
-                  Đã đăng nhập thành công nhưng không tìm thấy dữ liệu lịch thi nào.
-                </div>
-              <% } %>
             </div>
           <% } else if (result.viewType === 'combined') { %>
             <% const weekly = result.weekly; %>
@@ -1186,7 +1273,9 @@
         text += `${mins}p`;
 
         display.innerText = text;
-        display.style.color = display.closest('.term-card, .session-item').style.getPropertyValue('--accent') || 'var(--primary)';
+        const container = display.closest('.term-card, .session-item, .list-item, .exam-item');
+        const accent = container?.style?.getPropertyValue('--accent');
+        display.style.color = accent || 'var(--primary)';
       });
     }
 
