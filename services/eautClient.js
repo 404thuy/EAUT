@@ -45,12 +45,12 @@ let _browser = null;
 async function getBrowser() {
   if (_browser && _browser.connected) return _browser;
 
-  const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
   const execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  const isProduction = process.env.NODE_ENV === "production";
 
   if (execPath) {
-    // ── Railway / Render / Docker: dùng Chrome hệ thống ──────────────
-    console.log(`[BROWSER] Using system Chrome: ${execPath}`);
+    // ── Docker / Railway / Render: dùng Chrome hệ thống ──────────────
+    console.log(`[BROWSER] Docker mode - Chrome: ${execPath}`);
     const { default: puppeteerCore } = await import("puppeteer-core");
     _browser = await puppeteerCore.launch({
       headless: true,
@@ -65,21 +65,25 @@ async function getBrowser() {
         "--ignore-certificate-errors",
       ],
     });
-  } else if (isVercel) {
-    // ── Vercel Serverless: dùng @sparticuz/chromium ───────────────────
-    console.log("[BROWSER] Using @sparticuz/chromium for Vercel");
+  } else if (isProduction) {
+    // ── Production (Vercel): tải Chromium từ URL lúc runtime ─────────
+    console.log("[BROWSER] Production mode - downloading Chromium...");
     const { default: chromium } = await import("@sparticuz/chromium");
     const { default: puppeteerCore } = await import("puppeteer-core");
+    chromium.setHeadlessMode = true;
+    chromium.setGraphicsMode = false;
     _browser = await puppeteerCore.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
+      executablePath: await chromium.executablePath(
+        "https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar"
+      ),
       headless: chromium.headless,
       ignoreHTTPSErrors: true,
     });
   } else {
-    // ── Local: dùng puppeteer với Chrome đóng gói sẵn ─────────────────
-    console.log("[BROWSER] Using bundled Puppeteer Chrome (local)");
+    // ── Local dev: dùng puppeteer bình thường ─────────────────────────
+    console.log("[BROWSER] Local dev mode - bundled Chrome");
     const { default: puppeteer } = await import("puppeteer");
     _browser = await puppeteer.launch({
       headless: "new",
@@ -98,6 +102,7 @@ async function getBrowser() {
 
   return _browser;
 }
+
 
 
 // ─── Worker Pool & Concurrency Semaphore Queue ─────────────────────────
