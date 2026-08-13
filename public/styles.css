@@ -226,6 +226,7 @@ html, body {
   font-size: 1.35rem;
   background: linear-gradient(135deg, #fff, var(--accent-blue));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: -0.02em;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
@@ -234,6 +235,7 @@ html, body {
 html.light-theme .sidebar-title {
   background: linear-gradient(135deg, var(--primary), var(--accent-purple));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -1282,6 +1284,7 @@ select {
   .term-card h3 {
     font-size: 0.9rem;
     -webkit-line-clamp: unset; /* Remove truncation for full visibility */
+    line-clamp: unset;
   }
   .term-meta {
     font-size: 0.75rem;

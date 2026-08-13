@@ -43,7 +43,7 @@ function setCache(key, data) {
 // ─── Puppeteer Singleton Browser Management ────────────────────────────
 let _browser = null;
 async function getBrowser() {
-  const puppeteer = require("puppeteer");
+  const { default: puppeteer } = await import("puppeteer");
   if (_browser && _browser.connected) return _browser;
   _browser = await puppeteer.launch({
     headless: "new",
