@@ -66,19 +66,19 @@ async function getBrowser() {
       ],
     });
   } else if (isProduction) {
-    // ── Production (Vercel): tải Chromium từ URL lúc runtime ─────────
-    console.log("[BROWSER] Production mode - downloading Chromium...");
+    // ── Production (Vercel): dùng Chromium dành cho serverless ──
+    console.log("[BROWSER] Production mode - using @sparticuz/chromium");
+
     const { default: chromium } = await import("@sparticuz/chromium");
     const { default: puppeteerCore } = await import("puppeteer-core");
-    chromium.setHeadlessMode = true;
-    chromium.setGraphicsMode = false;
+
+    chromium.setGraphicsMode(false);
+
     _browser = await puppeteerCore.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(
-        "https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar"
-      ),
-      headless: chromium.headless,
+      executablePath: await chromium.executablePath(),
+      headless: "shell",
       ignoreHTTPSErrors: true,
     });
   } else {
@@ -176,8 +176,8 @@ async function createAuthenticatedPage(username, password) {
     const context = typeof browser.createBrowserContext === "function"
       ? await browser.createBrowserContext()
       : typeof browser.createIncognitoBrowserContext === "function"
-      ? await browser.createIncognitoBrowserContext()
-      : browser.defaultBrowserContext();
+        ? await browser.createIncognitoBrowserContext()
+        : browser.defaultBrowserContext();
 
     const page = await context.newPage();
     await page.setViewport({ width: 1280, height: 800 });
@@ -202,7 +202,7 @@ async function createAuthenticatedPage(username, password) {
 
         await Promise.all([
           page.click('#cms_authenticate_do_login'),
-          page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 25000 }).catch(() => {}),
+          page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 25000 }).catch(() => { }),
         ]);
       }
 
@@ -247,8 +247,8 @@ async function createAuthenticatedPage(username, password) {
       console.log(`[AUTH SUCCESS] Logged in for ${studentName || username} (${username}) (attempt ${attempt})`);
       return { browserContext: context, page, studentName };
     } catch (error) {
-      await page.close().catch(() => {});
-      await context.close().catch(() => {});
+      await page.close().catch(() => { });
+      await context.close().catch(() => { });
 
       if (error.message.includes("Đăng nhập thất bại")) {
         throw error;
@@ -597,7 +597,7 @@ async function fetchTermScheduleInternal(page, username, studentName, options = 
       },
       { timeout: 3000 }
     )
-    .catch(() => {});
+    .catch(() => { });
 
   // Extract semester dropdown options directly from DOM
   const semesterOptions = await page.evaluate(() => {
@@ -759,7 +759,7 @@ async function fetchExamScheduleInternal(page, username, studentName, options = 
         sel.value = semVal;
         sel.dispatchEvent(new Event("change", { bubbles: true }));
         if (window.$ && window.$.fn.select2) {
-          try { $(sel).trigger("change"); } catch (e) {}
+          try { $(sel).trigger("change"); } catch (e) { }
         }
       }
     }, targetSemester.value);
@@ -1041,8 +1041,8 @@ async function prefetchAllStudentData(username, password, options = {}) {
 
       return weeklyResult;
     } finally {
-      if (page) await page.close().catch(() => {});
-      if (browserContext) await browserContext.close().catch(() => {});
+      if (page) await page.close().catch(() => { });
+      if (browserContext) await browserContext.close().catch(() => { });
     }
   });
 }
@@ -1084,8 +1084,8 @@ async function getStudentTermSchedule(username, password, options = {}) {
       setCache(specificKey, result);
       return filterResultsBySemester(result, preferredSemester);
     } finally {
-      if (page) await page.close().catch(() => {});
-      if (browserContext) await browserContext.close().catch(() => {});
+      if (page) await page.close().catch(() => { });
+      if (browserContext) await browserContext.close().catch(() => { });
     }
   });
 }
@@ -1112,8 +1112,8 @@ async function getStudentExamSchedule(username, password, options = {}) {
       setCache(specificKey, result);
       return filterResultsBySemester(result, preferredSemester);
     } finally {
-      if (page) await page.close().catch(() => {});
-      if (browserContext) await browserContext.close().catch(() => {});
+      if (page) await page.close().catch(() => { });
+      if (browserContext) await browserContext.close().catch(() => { });
     }
   });
 }
