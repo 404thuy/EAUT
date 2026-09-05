@@ -1537,12 +1537,30 @@ html.light-theme .session-item {
   .sidebar {
     position: fixed;
     left: -100%;
+    top: 0;
+    bottom: 0;
     height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     box-shadow: 20px 0 50px rgba(0,0,0,0.5);
+    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 20px));
+    transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
   
   .sidebar.is-open {
     left: 0;
+  }
+  
+  .sidebar-nav {
+    flex: 0 0 auto !important;
+  }
+
+  .sidebar-footer {
+    margin-top: 1.5rem !important;
+    padding-top: 0 !important;
+    margin-bottom: calc(1.5rem + env(safe-area-inset-bottom, 15px)) !important;
   }
   
   .hamburger-btn {
