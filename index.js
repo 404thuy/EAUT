@@ -180,14 +180,44 @@ app.get("/schedule/exam", async (req, res) => {
 
   try {
     const isAll = selectedSemester === "all";
-    const result = await getStudentExamSchedule(saved.username, saved.password, {
-      preferredSemester: isAll ? "" : selectedSemester,
-      fetchAll: isAll,
-      useCache: !req.query.refresh,
-    });
+    const [result, termResult] = await Promise.all([
+      getStudentExamSchedule(saved.username, saved.password, {
+        preferredSemester: isAll ? "" : selectedSemester,
+        fetchAll: isAll,
+        useCache: !req.query.refresh,
+      }),
+      getStudentTermSchedule(saved.username, saved.password, {
+        fetchAll: true,
+        useCache: true,
+      }).catch(() => null),
+    ]);
+
+    const creditsMap = {};
+    if (termResult && Array.isArray(termResult.results)) {
+      termResult.results.forEach((sem) => {
+        (sem.rows || []).forEach((row) => {
+          if (Array.isArray(row)) {
+            let cName = "", cCredits = "";
+            row.forEach((cell) => {
+              const text = String(cell || "").replace(/<[^>]*>/g, "").trim();
+              if (/^\d{1,2}$/.test(text) && !cCredits && Number(text) >= 1 && Number(text) <= 10) {
+                cCredits = text;
+              } else if (!cName && text.length > 3 && !/^\d+$/.test(text) && !text.includes("/") && !text.toLowerCase().includes("học kỳ")) {
+                cName = text;
+              }
+            });
+            if (cName && cCredits) {
+              const normKey = cName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").trim();
+              creditsMap[normKey] = cCredits;
+            }
+          }
+        });
+      });
+    }
+
     return res.render("index", {
       error: null,
-      result: { ...result, viewType: "exam", selectedSemester },
+      result: { ...result, viewType: "exam", selectedSemester, creditsMap },
       formData: { username: saved.username, password: saved.password },
     });
   } catch (error) {

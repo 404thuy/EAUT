@@ -420,7 +420,22 @@ function formatSemLabel(raw) {
   return s;
 }
 
-function inferSemesterFromDate(dateStr, fallbackSemLabel) {
+function inferSemesterFromDate(dateStr, fallbackSemLabel, classCode = "") {
+  // 1. Check if classCode explicitly has semester pattern like -1-1-26 or -2-1-25
+  if (classCode) {
+    const codeMatch = String(classCode).match(/[-_](\d)[-_](\d)[-_](\d{2})/);
+    if (codeMatch) {
+      const hkNum = parseInt(codeMatch[1], 10);
+      let year = parseInt(codeMatch[3], 10);
+      if (year < 100) year += 2000;
+      if (hkNum === 1) {
+        return `HK1 (${year}-${year + 1})`;
+      } else {
+        return `HK${hkNum} (${year - 1}-${year})`;
+      }
+    }
+  }
+
   if (!dateStr || dateStr === "-") return fallbackSemLabel || "Học kỳ hiện tại";
   const parts = dateStr.split("/");
   if (parts.length !== 3) return fallbackSemLabel || "Học kỳ hiện tại";
@@ -431,15 +446,18 @@ function inferSemesterFromDate(dateStr, fallbackSemLabel) {
   if (isNaN(month) || isNaN(year)) return fallbackSemLabel || "Học kỳ hiện tại";
 
   let startYear, endYear, hkNum;
-  if (month >= 9) {
+  if (month >= 8) {
+    // Tháng 8, 9, 10, 11, 12 thuộc Học kỳ 1 của năm học mới (year - year+1)
     startYear = year;
     endYear = year + 1;
     hkNum = 1;
-  } else if (month <= 2) {
+  } else if (month <= 1) {
+    // Tháng 1 vẫn thuộc Học kỳ 1 của năm học trước (year-1 - year)
     startYear = year - 1;
     endYear = year;
     hkNum = 1;
   } else {
+    // Tháng 2, 3, 4, 5, 6, 7 thuộc Học kỳ 2 của năm học (year-1 - year)
     startYear = year - 1;
     endYear = year;
     hkNum = 2;
@@ -519,7 +537,24 @@ async function fetchWeeklyScheduleInternal(page, username, studentName, options 
     const gioHoc = gioBD !== "00:00" || gioKT !== "00:00" ? `${gioBD}-${gioKT}` : "-";
     const caHoc = item.CAHOC || item.TENCA || "-";
     const maLop = item.MALOPHOCPHAN || item.TENLOPHOCPHAN || "-";
-    const hinhThuc = item.HINHTHUCHOC || item.LOAILOPHOCPHAN || "-";
+    
+    // Determine Hình thức học: Trực tiếp vs Elearning
+    const rawMode = String(item.HINHTHUCHOC || item.LOAILOPHOCPHAN || "").trim();
+    const rawModeLower = rawMode.toLowerCase();
+    const roomClean = String(phong || "").trim();
+    const hasRoom = roomClean && roomClean !== "-" && roomClean !== "Đang cập nhật" && !roomClean.toLowerCase().includes("online") && !roomClean.toLowerCase().includes("elearning");
+
+    let hinhThuc = "Trực tiếp";
+    if (rawModeLower.includes("elearning") || rawModeLower.includes("online") || rawModeLower.includes("trực tuyến")) {
+      hinhThuc = "Elearning";
+    } else if (rawModeLower.includes("trực tiếp") || rawModeLower.includes("offline")) {
+      hinhThuc = "Trực tiếp";
+    } else if (hasRoom) {
+      hinhThuc = "Trực tiếp";
+    } else {
+      hinhThuc = "Elearning";
+    }
+
     return [thu, ngay, tenHP, phong, giangVien, String(tietBD), soTiet, gioHoc, caHoc, maLop, hinhThuc];
   });
 
@@ -607,7 +642,23 @@ async function fetchWeeklyScheduleInternal(page, username, studentName, options 
           const gioHoc = gioBD !== "00:00" || gioKT !== "00:00" ? `${gioBD}-${gioKT}` : "-";
           const caHoc = item.CAHOC || item.TENCA || "-";
           const maLop = item.MALOPHOCPHAN || item.TENLOPHOCPHAN || "-";
-          const hinhThuc = item.HINHTHUCHOC || item.LOAILOPHOCPHAN || "-";
+
+          const rawMode = String(item.HINHTHUCHOC || item.LOAILOPHOCPHAN || "").trim();
+          const rawModeLower = rawMode.toLowerCase();
+          const roomClean = String(phong || "").trim();
+          const hasRoom = roomClean && roomClean !== "-" && roomClean !== "Đang cập nhật" && !roomClean.toLowerCase().includes("online") && !roomClean.toLowerCase().includes("elearning");
+
+          let hinhThuc = "Trực tiếp";
+          if (rawModeLower.includes("elearning") || rawModeLower.includes("online") || rawModeLower.includes("trực tuyến")) {
+            hinhThuc = "Elearning";
+          } else if (rawModeLower.includes("trực tiếp") || rawModeLower.includes("offline")) {
+            hinhThuc = "Trực tiếp";
+          } else if (hasRoom) {
+            hinhThuc = "Trực tiếp";
+          } else {
+            hinhThuc = "Elearning";
+          }
+
           return [thu, ngay, tenHP, phong, giangVien, String(tietBD), soTiet, gioHoc, caHoc, maLop, hinhThuc];
         });
         altRows.sort((a, b) => {
@@ -706,10 +757,25 @@ async function fetchTermScheduleInternal(page, username, studentName, options = 
     const teacher = cleanString(s.TENGIAOVIEN || s.TENGV || s.GIANGVIEN) || "Đang cập nhật";
     const room = cleanString(s.PHONGHOC_TEN || s.TENPHONGHOC) || "Đang cập nhật";
     const credits = cleanString(s.SOTINCHI || s.TINCHI) || "3";
-    const hinhThuc = cleanString(s.HINHTHUCHOC || s.LOAILOPHOCPHAN) || "Chính thức";
+    const rawHinhThuc = cleanString(s.HINHTHUCHOC || s.LOAILOPHOCPHAN) || "";
     const ngay = s.NGAYHOC || "";
 
-    const semLabel = inferSemesterFromDate(ngay, "Học kỳ hiện tại");
+    const rawModeLower = rawHinhThuc.toLowerCase();
+    const roomClean = room.trim();
+    const hasRoom = roomClean && roomClean !== "-" && roomClean !== "Đang cập nhật" && !roomClean.toLowerCase().includes("online") && !roomClean.toLowerCase().includes("elearning");
+
+    let hinhThuc = "Trực tiếp";
+    if (rawModeLower.includes("elearning") || rawModeLower.includes("online") || rawModeLower.includes("trực tuyến")) {
+      hinhThuc = "Elearning";
+    } else if (rawModeLower.includes("trực tiếp") || rawModeLower.includes("offline")) {
+      hinhThuc = "Trực tiếp";
+    } else if (hasRoom) {
+      hinhThuc = "Trực tiếp";
+    } else {
+      hinhThuc = "Elearning";
+    }
+
+    const semLabel = inferSemesterFromDate(ngay, "Học kỳ hiện tại", cClass);
 
     if (!semMap.has(semLabel)) {
       semMap.set(semLabel, new Map());
@@ -724,10 +790,43 @@ async function fetchTermScheduleInternal(page, username, studentName, options = 
         credits: credits,
         teacher: teacher,
         room: room,
+        sessionDates: ngay ? [ngay] : [],
         sched: ngay ? `Lịch học: ${ngay}` : "Theo thời khóa biểu",
         fee: "0 đ",
         mode: hinhThuc,
       });
+    } else {
+      const existing = courseMap.get(cClass.toLowerCase());
+      if (ngay && !existing.sessionDates.includes(ngay)) {
+        existing.sessionDates.push(ngay);
+      }
+      if (teacher && teacher !== "Đang cập nhật") existing.teacher = teacher;
+      if (room && room !== "Đang cập nhật") {
+        existing.room = room;
+        if (hasRoom) existing.mode = "Trực tiếp";
+      }
+      if (hinhThuc === "Trực tiếp") existing.mode = "Trực tiếp";
+    }
+  }
+
+  // Format schedule date ranges for all courses
+  for (const courseMap of semMap.values()) {
+    for (const course of courseMap.values()) {
+      if (course.sessionDates && course.sessionDates.length > 0) {
+        course.sessionDates.sort((a, b) => {
+          const dA = parseDDMMYYYY(a) || new Date(0);
+          const dB = parseDDMMYYYY(b) || new Date(0);
+          return dA - dB;
+        });
+        const first = course.sessionDates[0];
+        const last = course.sessionDates[course.sessionDates.length - 1];
+        if (first === last) {
+          course.sched = `Bắt đầu ${first}`;
+        } else {
+          course.sched = `${first} → ${last}`;
+        }
+      }
+      delete course.sessionDates;
     }
   }
 
@@ -740,12 +839,37 @@ async function fetchTermScheduleInternal(page, username, studentName, options = 
     });
   }
 
+  // Sort mergedResults chronologically oldest first so reverse() in index.ejs renders newest semester on top
+  mergedResults.sort((a, b) => {
+    const parseSem = (s) => {
+      const m = String(s).match(/HK(\d+)\s*\((\d{4})-(\d{4})\)/i);
+      if (m) return parseInt(m[2]) * 10 + parseInt(m[1]);
+      return 0;
+    };
+    return parseSem(a.semester) - parseSem(b.semester);
+  });
+
   // Format semester options for UI dropdown
   let formattedSemesterOptions = semesterOptions.map((s) => ({
     label: formatSemLabel(s.label),
     value: s.value,
     selected: preferredSemester === s.value,
   }));
+
+  // Ensure all semesters present in mergedResults exist in dropdown options
+  for (const r of mergedResults) {
+    const semName = r.semester;
+    const exists = formattedSemesterOptions.some(
+      (opt) => opt.label === semName || formatSemLabel(opt.label) === semName
+    );
+    if (!exists) {
+      formattedSemesterOptions.push({
+        label: semName,
+        value: semName,
+        selected: preferredSemester === semName,
+      });
+    }
+  }
 
   // Failsafe: If DOM select options were empty, fallback to semMap keys!
   if (formattedSemesterOptions.length === 0) {
@@ -757,6 +881,16 @@ async function fetchTermScheduleInternal(page, username, studentName, options = 
       });
     }
   }
+
+  // Sort semester options newest first
+  formattedSemesterOptions.sort((a, b) => {
+    const parseSem = (s) => {
+      const m = String(s).match(/HK(\d+)\s*\((\d{4})-(\d{4})\)/i);
+      if (m) return parseInt(m[2]) * 10 + parseInt(m[1]);
+      return 0;
+    };
+    return parseSem(b.label) - parseSem(a.label);
+  });
 
   const finalOptions = [
     { label: "-- Xem tất cả học kỳ --", value: "all", selected: !preferredSemester || preferredSemester === "all" },
@@ -782,12 +916,24 @@ async function fetchExamScheduleInternal(page, username, studentName, options = 
     "AF6FFE7566A84F058C31083395D4ED4B"
   );
 
+  // 1. Wait up to 4s for #dropSearch_HocKy to populate with options
+  await page
+    .waitForFunction(
+      () => {
+        const sel = document.querySelector("#dropSearch_HocKy");
+        return sel && sel.querySelectorAll("option").length > 1;
+      },
+      { timeout: 4000 }
+    )
+    .catch(() => {});
+
+  // 2. Extract semester dropdown options directly from DOM
   const semesterOptions = await page.evaluate(() => {
     const options = [];
     const sel = document.querySelector("#dropSearch_HocKy");
     if (sel) {
       sel.querySelectorAll("option").forEach((opt) => {
-        if (opt.value) {
+        if (opt.value && opt.value !== "all") {
           options.push({ label: opt.textContent.trim(), value: opt.value, selected: opt.selected });
         }
       });
@@ -795,53 +941,237 @@ async function fetchExamScheduleInternal(page, username, studentName, options = 
     return options;
   });
 
-  let targetSemester = null;
+  // 3. Determine which semesters to scrape from DOM table
+  let semestersToScrape = [];
   if (preferredSemester && preferredSemester !== "all") {
-    targetSemester = semesterOptions.find((s) => s.value === preferredSemester || s.label === preferredSemester);
+    const matched = semesterOptions.find(
+      (s) => s.value === preferredSemester || s.label === preferredSemester || formatSemLabel(s.label) === preferredSemester
+    );
+    if (matched) {
+      semestersToScrape = [matched];
+    } else {
+      semestersToScrape = semesterOptions;
+    }
+  } else {
+    semestersToScrape = semesterOptions;
   }
-  if (!targetSemester) {
-    targetSemester = semesterOptions.find((s) => s.selected) || semesterOptions[0];
+  if (semestersToScrape.length === 0 && semesterOptions.length > 0) {
+    semestersToScrape = semesterOptions;
   }
 
   const scrapedResultsMap = new Map();
-  if (targetSemester) {
+
+  // 4. Scrape each semester from #tblLichThiCaNhan (or fallback #tblLichThiChung)
+  for (const semOpt of semestersToScrape) {
+    const semLabel = formatSemLabel(semOpt.label);
+
     await page.evaluate((semVal) => {
       const sel = document.querySelector("#dropSearch_HocKy");
       if (sel) {
         sel.value = semVal;
         sel.dispatchEvent(new Event("change", { bubbles: true }));
         if (window.$ && window.$.fn.select2) {
-          try { $(sel).trigger("change"); } catch (e) { }
+          try { $(sel).trigger("change"); } catch (e) {}
         }
       }
-    }, targetSemester.value);
-    await new Promise((r) => setTimeout(r, 250));
+    }, semOpt.value);
+    await new Promise((r) => setTimeout(r, 150));
 
     await page.evaluate(() => {
       const btn = document.querySelector("#btnXemLich");
       if (btn) btn.click();
     });
-    await new Promise((r) => setTimeout(r, 700));
+
+    await page
+      .waitForFunction(
+        () => {
+          const pTable = document.querySelector("#tblLichThiCaNhan tbody");
+          const cTable = document.querySelector("#tblLichThiChung tbody");
+          return (pTable && pTable.querySelectorAll("tr").length > 0) || (cTable && cTable.querySelectorAll("tr").length > 0);
+        },
+        { timeout: 2200 }
+      )
+      .catch(() => {});
+    await new Promise((r) => setTimeout(r, 250));
 
     const rows = await page.evaluate(() => {
-      const table = document.querySelector("#tblLichThiCaNhan");
-      if (!table) return [];
       const res = [];
-      table.querySelectorAll("tbody tr").forEach((tr) => {
-        const cells = [];
-        tr.querySelectorAll("td").forEach((td) => cells.push(td.textContent.trim()));
-        if (cells.length > 2 && cells.some((c) => c)) res.push(cells);
-      });
+      const clean = (s) => (s || "").trim().replace(/\s+/g, " ");
+
+      // Lịch thi cá nhân: [STT, Mã HP, Tên HP, Lần thi, Ngày thi, Thời gian thi, Hình thức, Phòng thi, SBD, Thông tin SV]
+      const pTable = document.querySelector("#tblLichThiCaNhan");
+      if (pTable) {
+        pTable.querySelectorAll("tbody tr").forEach((tr) => {
+          const cells = [];
+          tr.querySelectorAll("td").forEach((td) => cells.push(clean(td.textContent)));
+          if (cells.length > 2 && cells.some((c) => c)) res.push(cells);
+        });
+      }
+
+      // Kế hoạch thi chung fallback: [STT, Mã HP, Tên HP, Ngày thi, Thời gian thi, Hình thức, Phòng thi, SBD]
+      if (res.length === 0) {
+        const cTable = document.querySelector("#tblLichThiChung");
+        if (cTable) {
+          cTable.querySelectorAll("tbody tr").forEach((tr) => {
+            const cells = [];
+            tr.querySelectorAll("td").forEach((td) => cells.push(clean(td.textContent)));
+            if (cells.length > 2 && cells.some((c) => c)) {
+              res.push([
+                cells[0] || "",
+                cells[1] || "",
+                cells[2] || "",
+                "1",
+                cells[3] || "-",
+                cells[4] || "-",
+                cells[5] || "-",
+                cells[6] || "-",
+                cells[7] || "-",
+                ""
+              ]);
+            }
+          });
+        }
+      }
       return res;
     });
 
     if (rows && rows.length > 0) {
-      const label = formatSemLabel(targetSemester.label);
-      scrapedResultsMap.set(label, rows);
+      scrapedResultsMap.set(semLabel, rows);
     }
   }
 
+  // 5. Query SPA APIs for 100% accurate SBD from official student exam endpoints
   const userId = await page.evaluate(() => window.edu?.system?.userId || "");
+
+  // Query all available exam semesters from API LayDSThoiGianLichThi
+  try {
+    const hocKyResp = await callSPAApi(
+      page,
+      "SV_ThongTin_MH/DSA4BRIVKS4oBiggLw0oIikVKSgP",
+      "pkg_congthongtin_hssv_thongtin.LayDSThoiGianLichThi",
+      {
+        strNguoiThucHien_Id: userId,
+      }
+    );
+    if (hocKyResp && hocKyResp.Success && Array.isArray(hocKyResp.Data)) {
+      hocKyResp.Data.forEach((hk) => {
+        if (hk && hk.ID && !semesterOptions.some((s) => s.value === hk.ID)) {
+          semesterOptions.push({
+            label: hk.THOIGIAN ? hk.THOIGIAN.trim() : hk.ID,
+            value: hk.ID,
+            selected: false,
+          });
+        }
+      });
+    }
+  } catch (e) {}
+
+  const mergedSemestersMap = new Map();
+
+  // Populate scraped table rows
+  for (const [semLabel, rows] of scrapedResultsMap.entries()) {
+    if (!mergedSemestersMap.has(semLabel)) {
+      mergedSemestersMap.set(semLabel, []);
+    }
+    const semRows = mergedSemestersMap.get(semLabel);
+
+    for (const cells of rows) {
+      const courseName = cells[2] || cells[1] || "-";
+      const attempt = String(cells[3] || "1").replace(/\D/g, "") || "1";
+      const date = cells[4] || "-";
+      const time = cells[5] || "-";
+      const format = cells[6] && cells[6] !== "-" ? cells[6] : "Thi kết thúc HP";
+      const room = cells[7] || "-";
+      const sbd = cells[8] || "-";
+
+      const existing = semRows.find((r) => r[1].toLowerCase().trim() === courseName.toLowerCase().trim());
+      if (!existing) {
+        semRows.push([semLabel, courseName, attempt, "-", date, "-", time, room, sbd, format]);
+      } else {
+        if ((!existing[8] || existing[8] === "-") && sbd !== "-") existing[8] = sbd;
+        if ((!existing[7] || existing[7] === "-") && room !== "-") existing[7] = room;
+        if ((!existing[9] || existing[9] === "-" || existing[9] === "Thi kết thúc HP") && format !== "-") existing[9] = format;
+        if ((!existing[6] || existing[6] === "-") && time !== "-") existing[6] = time;
+        if ((!existing[4] || existing[4] === "-") && date !== "-") existing[4] = date;
+      }
+    }
+  }
+
+  // Query official exam API LayDSLichThi_KeHoachThi (regular + history) for each semester
+  const pad = (n) => String(n || 0).padStart(2, "0");
+  const cleanStr = (s) => String(s || "").trim();
+
+  for (const semOpt of semesterOptions) {
+    const semLabel = formatSemLabel(semOpt.label);
+    if (!mergedSemestersMap.has(semLabel)) {
+      mergedSemestersMap.set(semLabel, []);
+    }
+    const semRows = mergedSemestersMap.get(semLabel);
+
+    const callKeHoachThi = async (actionPath) => {
+      try {
+        const resp = await callSPAApi(
+          page,
+          actionPath,
+          "pkg_congthongtin_hssv_thongtin.LayDSLichThi_KeHoachThi",
+          {
+            strQLSV_NguoiHoc_Id: userId,
+            strDaoTao_ThoiGianDaoTao_Id: semOpt.value || "",
+            strDaoTao_HocPhan_Id: "",
+          }
+        );
+        return resp && resp.Success && resp.Data ? resp.Data : null;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const dCurrent = await callKeHoachThi("SV_ThongTin_MH/DSA4BRINKCIpFSkoHgokCS4gIikVKSgP");
+    const dHistory = await callKeHoachThi("SV_ThongTin_MH/DSA4BRINKCIpFSkoHgokCS4gIikVKSgeDSgiKRI0");
+
+    const caNhanList = [
+      ...(dCurrent && Array.isArray(dCurrent.rsLichThiCaNhan) ? dCurrent.rsLichThiCaNhan : []),
+      ...(dHistory && Array.isArray(dHistory.rsLichThiCaNhan) ? dHistory.rsLichThiCaNhan : []),
+    ];
+    const chungList = [
+      ...(dCurrent && Array.isArray(dCurrent.rsKeHoachThiChung) ? dCurrent.rsKeHoachThiChung : []),
+      ...(dHistory && Array.isArray(dHistory.rsKeHoachThiChung) ? dHistory.rsKeHoachThiChung : []),
+    ];
+
+    const processItem = (item, isPersonal = false) => {
+      if (!item) return;
+      const cName = cleanStr(item.TENHOCPHAN);
+      if (!cName) return;
+      const attempt = String(item.LANTHI || "1").replace(/\D/g, "") || "1";
+      const date = item.NGAYHOC || "-";
+      const time = (item.GIOBATDAU != null || item.PHUTBATDAU != null)
+        ? `${pad(item.GIOBATDAU)}:${pad(item.PHUTBATDAU)} - ${pad(item.GIOKETTHUC)}:${pad(item.PHUTKETTHUC)}`
+        : "-";
+      const format = cleanStr(item.DANGKY_LOPHOCPHAN_TEN) || "Thi kết thúc HP";
+      const room = cleanStr(item.PHONGHOC_TEN) || "-";
+      const rawSbd = item.SOBAODANH != null ? String(item.SOBAODANH).trim() : "";
+      const sbd = (rawSbd && rawSbd !== "0" && rawSbd !== "-") ? rawSbd : (item.SBD || item.SO_BAO_DANH || "-");
+      const credits = cleanStr(item.SOTINCHI || item.SO_TIN_CHI || item.TINCHI || item.SOTC || "");
+
+      const existing = semRows.find((r) => r[1].toLowerCase().trim() === cName.toLowerCase().trim());
+      if (!existing) {
+        semRows.push([semLabel, cName, attempt, "-", date, "-", time, room, sbd, format, credits]);
+      } else {
+        if ((!existing[8] || existing[8] === "-") && sbd !== "-") existing[8] = sbd;
+        if ((!existing[7] || existing[7] === "-") && room !== "-") existing[7] = room;
+        if ((!existing[9] || existing[9] === "-" || existing[9] === "Thi kết thúc HP") && format !== "-") existing[9] = format;
+        if ((!existing[6] || existing[6] === "-") && time !== "-") existing[6] = time;
+        if ((!existing[4] || existing[4] === "-") && date !== "-") existing[4] = date;
+        if (isPersonal && sbd !== "-") existing[8] = sbd;
+        if (!existing[10] && credits) existing[10] = credits;
+      }
+    };
+
+    caNhanList.forEach((it) => processItem(it, true));
+    chungList.forEach((it) => processItem(it, false));
+  }
+
+  // Cross-query general student schedule API LayDSLichCaNhan as further cross-enrichment
   const now = new Date();
   const examStart = new Date(now.getFullYear() - 1, 0, 1);
   const examEnd = new Date(now.getFullYear() + 1, 11, 31);
@@ -860,72 +1190,59 @@ async function fetchExamScheduleInternal(page, username, studentName, options = 
   const allItems = (apiResponse && apiResponse.Success && apiResponse.Data) ? apiResponse.Data : [];
   const apiExamItems = allItems.filter((e) => e && e.PHANLOAI === "LICHTHI");
 
-  const examHeaders = ["HK", "Môn", "Lần", "Đợt", "Ngày", "Buổi", "Giờ", "Phòng", "SBD", "Hình thức"];
-  const mergedSemestersMap = new Map();
-
-  for (const [semLabel, rows] of scrapedResultsMap.entries()) {
-    for (const cells of rows) {
-      const courseName = cells[2] || cells[1] || "-";
-      const attempt = cells[3] || "1";
-      const date = cells[4] || "-";
-      const time = cells[5] || "-";
-      const format = cells[6] && cells[6] !== "-" ? cells[6] : "Thi kết thúc HP";
-      const room = cells[7] || "-";
-      const sbd = cells[8] || "-";
-
-      const inferredSem = inferSemesterFromDate(date, semLabel);
-      const attemptNum = parseInt(attempt, 10) || 1;
-      const realSemLabel = attemptNum > 1 ? "Khác" : inferredSem;
-
-      if (!mergedSemestersMap.has(realSemLabel)) {
-        mergedSemestersMap.set(realSemLabel, []);
-      }
-      const semRows = mergedSemestersMap.get(realSemLabel);
-
-      const existing = semRows.find((r) => r[1].toLowerCase().trim() === courseName.toLowerCase().trim());
-      if (!existing) {
-        semRows.push([realSemLabel, courseName, attempt, "-", date, "-", time, room, sbd, format]);
-      } else {
-        if ((!existing[8] || existing[8] === "-") && sbd !== "-") existing[8] = sbd;
-        if ((!existing[7] || existing[7] === "-") && room !== "-") existing[7] = room;
-        if ((!existing[9] || existing[9] === "-" || existing[9] === "Thi kết thúc HP") && format !== "-") existing[9] = format;
-      }
-    }
-  }
-
   if (apiExamItems.length > 0) {
     for (const item of apiExamItems) {
-      const pad = (n) => String(n || 0).padStart(2, "0");
-      const cName = item.TENHOCPHAN || "-";
+      const cName = String(item.TENHOCPHAN || "").trim();
+      if (!cName) continue;
+
       const date = item.NGAYHOC || "-";
       const gioBD = `${pad(item.GIOBATDAU)}:${pad(item.PHUTBATDAU)}`;
       const gioKT = `${pad(item.GIOKETTHUC)}:${pad(item.PHUTKETTHUC)}`;
       const time = (gioBD !== "00:00" || gioKT !== "00:00") ? `${gioBD} - ${gioKT}` : "-";
       const room = item.PHONGHOC_TEN || item.TENPHONGHOC || item.PHONGTHI || "-";
-      const sbd = (item.SOBAODANH && item.SOBAODANH !== "0") ? item.SOBAODANH : (item.SBD || "-");
-      const format = item.HINHTHUCTHI || item.DANGKY_LOPHOCPHAN_TEN || item.LOAILOPHOCPHAN || "Thi kết thúc HP";
+      const rawSbd = item.SOBAODANH != null ? String(item.SOBAODANH).trim() : "";
+      const sbd = (rawSbd && rawSbd !== "0" && rawSbd !== "-") ? rawSbd : (item.SBD || item.SO_BAO_DANH || "-");
+      const format = item.HINHTHUCTHI || item.LOAILOPHOCPHAN || item.DANGKY_LOPHOCPHAN_TEN || "Thi kết thúc HP";
+      const attempt = String(item.LANTHI || "1").replace(/\D/g, "") || "1";
+      const classCode = item.DANGKY_LOPHOCPHAN_MA || item.MALOPHOCPHAN || "";
 
-      const inferredSem = inferSemesterFromDate(date, "Học kỳ hiện tại");
-      const attemptNumApi = parseInt(item.LANTHI, 10) || 1;
-      const realSemLabel = attemptNumApi > 1 ? "Khác" : inferredSem;
-
-      if (!mergedSemestersMap.has(realSemLabel)) {
-        mergedSemestersMap.set(realSemLabel, []);
+      // Check if course already exists in ANY semester
+      let foundExisting = false;
+      for (const [_, rowsList] of mergedSemestersMap.entries()) {
+        const match = rowsList.find((r) => r[1].toLowerCase().trim() === cName.toLowerCase().trim());
+        if (match) {
+          foundExisting = true;
+          if ((!match[8] || match[8] === "-") && sbd !== "-") match[8] = sbd;
+          if ((!match[7] || match[7] === "-") && room !== "-") match[7] = room;
+          if ((!match[9] || match[9] === "-" || match[9] === "Thi kết thúc HP") && format && format !== "Thi kết thúc HP") match[9] = format;
+          if ((!match[6] || match[6] === "-") && time !== "-") match[6] = time;
+          if ((!match[4] || match[4] === "-") && date !== "-") match[4] = date;
+          break;
+        }
       }
-      const semRows = mergedSemestersMap.get(realSemLabel);
 
-      const match = semRows.find((r) => r[1].toLowerCase().trim() === cName.toLowerCase().trim());
-      if (match) {
-        if ((!match[8] || match[8] === "-") && sbd !== "-") match[8] = sbd;
-        if ((!match[7] || match[7] === "-") && room !== "-") match[7] = room;
-        if ((!match[9] || match[9] === "-" || match[9] === "Thi kết thúc HP") && format !== "-") match[9] = format;
-        if ((!match[6] || match[6] === "-") && time !== "-") match[6] = time;
-      } else {
-        semRows.push([realSemLabel, cName, item.LANTHI || "1", "-", date, "-", time, room, sbd, format]);
+      // If not present in any semester, add using inferred semester
+      if (!foundExisting) {
+        const inferredSem = inferSemesterFromDate(date, "Học kỳ hiện tại", classCode);
+        if (!mergedSemestersMap.has(inferredSem)) {
+          mergedSemestersMap.set(inferredSem, []);
+        }
+        mergedSemestersMap.get(inferredSem).push([inferredSem, cName, attempt, "-", date, "-", time, room, sbd, format, ""]);
       }
     }
   }
 
+  // Sort rows chronologically inside each semester
+  for (const rows of mergedSemestersMap.values()) {
+    rows.sort((a, b) => {
+      const dateA = parseDDMMYYYY(a[4]) || new Date(0);
+      const dateB = parseDDMMYYYY(b[4]) || new Date(0);
+      if (dateA.getTime() !== dateB.getTime()) return dateA - dateB;
+      return (a[1] || "").localeCompare(b[1] || "");
+    });
+  }
+
+  const examHeaders = ["HK", "Môn", "Lần", "Đợt", "Ngày", "Buổi", "Giờ", "Phòng", "SBD", "Hình thức"];
   let allResults = [];
   for (const [semester, rows] of mergedSemestersMap.entries()) {
     allResults.push({
@@ -935,9 +1252,19 @@ async function fetchExamScheduleInternal(page, username, studentName, options = 
     });
   }
 
+  // Sort semesters: newest first
+  allResults.sort((a, b) => {
+    const parseSem = (s) => {
+      const m = String(s).match(/HK(\d+)\s*\((\d{4})-(\d{4})\)/i);
+      if (m) return parseInt(m[2]) * 10 + parseInt(m[1]);
+      return 0;
+    };
+    return parseSem(b.semester) - parseSem(a.semester);
+  });
+
   let finalResults = [];
   if (preferredSemester && preferredSemester !== "all") {
-    const selectedOpt = semesterOptions.find((s) => s.value === preferredSemester);
+    const selectedOpt = semesterOptions.find((s) => s.value === preferredSemester || s.label === preferredSemester);
     const targetLabel = selectedOpt ? formatSemLabel(selectedOpt.label) : formatSemLabel(preferredSemester);
 
     finalResults = allResults.filter((r) => r.semester === targetLabel);
@@ -952,8 +1279,32 @@ async function fetchExamScheduleInternal(page, username, studentName, options = 
   const formattedSemesterOptions = semesterOptions.map((s) => ({
     label: formatSemLabel(s.label),
     value: s.value,
-    selected: preferredSemester === s.value,
+    selected: preferredSemester === s.value || preferredSemester === formatSemLabel(s.label),
   }));
+
+  // Ensure all scraped semesters exist in dropdown
+  for (const r of allResults) {
+    const semName = r.semester;
+    const exists = formattedSemesterOptions.some(
+      (opt) => opt.label === semName || formatSemLabel(opt.label) === semName
+    );
+    if (!exists) {
+      formattedSemesterOptions.push({
+        label: semName,
+        value: semName,
+        selected: preferredSemester === semName,
+      });
+    }
+  }
+
+  formattedSemesterOptions.sort((a, b) => {
+    const parseSem = (s) => {
+      const m = String(s).match(/HK(\d+)\s*\((\d{4})-(\d{4})\)/i);
+      if (m) return parseInt(m[2]) * 10 + parseInt(m[1]);
+      return 0;
+    };
+    return parseSem(b.label) - parseSem(a.label);
+  });
 
   const hasAll = formattedSemesterOptions.some((o) => o.value === "all");
   const finalOptions = hasAll

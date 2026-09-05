@@ -1,6 +1,66 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
+// --- Tactile Soft Sound FX (Cảm ứng chạm tiếng êm dịu, ấm áp & thư thái) ---
+let audioCtx = null;
+let lastTapTimestamp = 0;
+
+function playSoftTap() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    if (!audioCtx) {
+      audioCtx = new AudioContextClass();
+    }
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+
+    // Lọc thông thấp (lowpass) tại ~680Hz để triệt tiêu hoàn toàn âm chói, cho tiếng ấm tròn êm tai
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(680, t);
+    filter.Q.setValueAtTime(1.1, t);
+
+    // Dạng sóng Sine thuần khiết, lướt tần số nhẹ từ 300Hz xuống 120Hz tạo độ nảy haptic tự nhiên
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(300, t);
+    osc.frequency.exponentialRampToValueAtTime(120, t + 0.038);
+
+    // Âm lượng khẽ (0.04), suy giảm mượt mà về 0 trong 38ms
+    gain.gain.setValueAtTime(0.04, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.038);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start(t);
+    osc.stop(t + 0.042);
+  } catch (err) {
+    // Fail silently without disturbing UI
+  }
+}
+
+window.playTactileTap = playSoftTap;
+
+// Bắt cảm ứng chạm (touch/pointer) mượt mà không độ trễ trên tất cả các phần tử tương tác
+document.addEventListener("pointerdown", (event) => {
+  const interactiveSelector = "button, a, summary, [role='button'], select, input[type='submit'], input[type='button'], input[type='checkbox'], input[type='radio'], .btn, .icon-btn, .nav-item, .session-item, .term-card, [data-view-mode], [data-day-filter]";
+  const target = event.target && event.target.closest(interactiveSelector);
+  if (target) {
+    const now = performance.now();
+    if (now - lastTapTimestamp > 45) {
+      lastTapTimestamp = now;
+      playSoftTap();
+    }
+  }
+}, { passive: true });
+
 // Sidebar (mobile)
 const sidebar = $("[data-sidebar]");
 const sidebarToggle = $("[data-sidebar-toggle]");

@@ -69,6 +69,49 @@
     return { shift: 5, range: "18:30 - 21:00" };
   };
 
+  getShiftTimeRange = (item, shift) => {
+    if (item && item.time && item.time !== '-') {
+      const match = String(item.time).match(/(\d{1,2}[:h]\d{2})\s*[-–]\s*(\d{1,2}[:h]\d{2})/i);
+      if (match) {
+        return [match[1].replace(/h/gi, ':'), match[2].replace(/h/gi, ':')];
+      }
+    }
+    const s = Number(shift) || 1;
+    if (s === 1) return ["07:00", "09:30"];
+    if (s === 2) return ["09:40", "12:10"];
+    if (s === 3) return ["13:00", "15:30"];
+    if (s === 4) return ["15:40", "18:10"];
+    return ["18:30", "21:00"];
+  };
+
+  formatISODateTime = (dateStr, timeStr) => {
+    if (!dateStr || !timeStr) return "";
+    let yyyy = "", mm = "", dd = "";
+    const str = String(dateStr).trim();
+    const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (isoMatch) {
+      yyyy = isoMatch[1];
+      mm = String(Number(isoMatch[2])).padStart(2, '0');
+      dd = String(Number(isoMatch[3])).padStart(2, '0');
+    } else {
+      const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/);
+      if (dmyMatch) {
+        let year = Number(dmyMatch[3]);
+        if (year < 100) year += 2000;
+        yyyy = String(year);
+        mm = String(Number(dmyMatch[2])).padStart(2, '0');
+        dd = String(Number(dmyMatch[1])).padStart(2, '0');
+      } else {
+        return "";
+      }
+    }
+
+    const tParts = String(timeStr).replace(/h/gi, ':').trim().split(':');
+    const hh = String(Number(tParts[0]) || 0).padStart(2, '0');
+    const min = String(Number(tParts[1]) || 0).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}:00`;
+  };
+
   deduplicate = (str) => {
     if (!str) return "";
     // First, split by our injected | or naturally occurring spaces
@@ -122,8 +165,444 @@
     <link rel="shortcut icon" type="image/png" href="/logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,600;1,700;1,800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css?v=5.1" />
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,600;1,700;1,800&display=swap');
+      
+      /* Universal Nunito typography across all views */
+      *, *::before, *::after,
+      html, body,
+      input, button, select, textarea,
+      h1, h2, h3, h4, h5, h6, p, span, a, div, table, th, td, label {
+        font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+      }
+      .ping-badge, .ping-badge * {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+      }
+
+      /* Clean, Bright, Sáng Đẹp Canvas in Light Mode (Chuẩn 100% Ảnh 1) */
+      html.light-theme,
+      html.light-theme body,
+      html.light-theme .app-shell,
+      html.light-theme .app-layout {
+        background-color: #ffffff !important;
+        background: #ffffff !important;
+        color: #0f172a !important;
+      }
+
+      html.light-theme .app-main {
+        background-color: #f8fafc !important;
+        background: #f8fafc !important;
+      }
+
+      html.light-theme .week-board__legend {
+        color: #334155 !important;
+        font-weight: 700 !important;
+        font-size: 0.76rem !important;
+        background: transparent !important;
+      }
+
+      html.light-theme .week-grid-wrap {
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05) !important;
+        border-radius: var(--radius-lg) !important;
+      }
+
+      html.light-theme .week-grid thead th {
+        background: #ffffff !important;
+        border-bottom: 1px solid #edf2f7 !important;
+        padding-top: 0.75rem !important;
+        padding-bottom: 0.75rem !important;
+      }
+
+      html.light-theme .week-grid__dayTitle {
+        color: #4f46e5 !important; /* Tím/Indigo sáng rực rỡ chuẩn ảnh 1 */
+        font-weight: 850 !important;
+        font-size: 0.88rem !important;
+        margin-bottom: 3px !important;
+      }
+
+      html.light-theme .week-grid__dayDate {
+        color: #1e293b !important;
+        font-weight: 700 !important;
+        font-size: 0.72rem !important;
+        margin-bottom: 3px !important;
+      }
+
+      html.light-theme .week-grid__dayCount {
+        color: #475569 !important;
+        font-size: 0.70rem !important;
+        font-weight: 600 !important;
+        line-height: 1.35 !important;
+      }
+
+      html.light-theme .week-grid__dayCount strong {
+        color: #0f172a !important;
+        font-weight: 850 !important;
+      }
+
+      html.light-theme .week-grid__corner {
+        color: #1e293b !important;
+        font-weight: 850 !important;
+        font-size: 0.78rem !important;
+      }
+
+      html.light-theme .week-grid__shiftNum {
+        color: #4f46e5 !important;
+        font-weight: 800 !important;
+        font-size: 0.82rem !important;
+      }
+
+      html.light-theme .week-grid__shiftTime {
+        color: #475569 !important;
+        font-weight: 700 !important;
+      }
+
+      html.light-theme .term-card,
+      html.light-theme .session-item,
+      html.light-theme .list-item,
+      html.light-theme .card,
+      html.light-theme .nav-card {
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05) !important;
+      }
+
+      html.light-theme .session-item:hover,
+      html.light-theme .list-item:hover,
+      html.light-theme .term-card:hover {
+        background: #ffffff !important;
+        border-color: #4f46e5 !important;
+        box-shadow: 0 10px 24px -3px rgba(79, 70, 229, 0.18) !important;
+        transform: translateY(-2px) !important;
+      }
+
+      /* Clean & borderless weekly table schedule */
+      .week-grid,
+      .week-grid th,
+      .week-grid td,
+      .week-grid thead th,
+      .week-grid tbody td,
+      .week-grid tbody th,
+      .week-grid tr {
+        border: none !important;
+        outline: none !important;
+      }
+      .week-grid tbody tr:not(:last-child) td,
+      .week-grid tbody tr:not(:last-child) th {
+        border-bottom: none !important;
+      }
+      .session-item__title {
+        font-size: 0.8rem !important;
+        font-weight: 800 !important;
+        color: var(--text-main) !important;
+      }
+      .exam-meta-grid {
+        display: grid !important;
+        grid-template-columns: auto 1fr !important;
+        gap: 0.35rem 0.75rem !important;
+      }
+      .exam-meta-grid > div {
+        font-size: 0.72rem !important;
+        white-space: nowrap !important;
+        min-width: 0 !important;
+      }
+      .exam-meta-grid span {
+        white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+      }
+
+      /* Exam credit badge: bold, punchy, compact */
+      .exam-credit-badge {
+        font-size: 0.72rem !important;
+        font-weight: 850 !important;
+        border-radius: 9999px !important;
+        padding: 2.5px 8.5px !important;
+        letter-spacing: 0.02em !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+      }
+      html.light-theme .exam-credit-badge {
+        background: #ede9fe !important;
+        color: #5b21b6 !important;
+        border: 1.5px solid #a855f7 !important;
+        box-shadow: 0 1px 3px rgba(168, 85, 247, 0.12) !important;
+      }
+      html:not(.light-theme) .exam-credit-badge {
+        background: rgba(168, 85, 247, 0.2) !important;
+        color: #d8b4fe !important;
+        border: 1.5px solid rgba(168, 85, 247, 0.5) !important;
+      }
+      /* Exam Card Footer countdown tag: NO inner bubble/border/pill */
+      .exam-card-footer .countdown-tag,
+      html.light-theme .exam-card-footer .countdown-tag,
+      html.light-theme .exam-card-footer .countdown-tag.is-ended,
+      html.light-theme .exam-card-footer .countdown-tag.is-ongoing,
+      html.light-theme .exam-card-footer .countdown-tag.is-upcoming,
+      .exam-card-footer .countdown-tag.is-ended,
+      .exam-card-footer .countdown-tag.is-ongoing,
+      .exam-card-footer .countdown-tag.is-upcoming {
+        background: transparent !important;
+        background-color: transparent !important;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        animation: none !important;
+      }
+
+      .exam-card-footer .countdown-tag.is-ended,
+      html.light-theme .exam-card-footer .countdown-tag.is-ended {
+        color: #475569 !important;
+        font-weight: 750 !important;
+      }
+
+      .exam-card-footer .countdown-tag.is-ongoing,
+      html.light-theme .exam-card-footer .countdown-tag.is-ongoing {
+        color: #ea580c !important;
+        font-weight: 850 !important;
+      }
+
+      .exam-card-footer .countdown-tag.is-upcoming,
+      html.light-theme .exam-card-footer .countdown-tag.is-upcoming {
+        color: #4f46e5 !important;
+        font-weight: 850 !important;
+      }
+
+      /* Sidebar Menu Navigation - 1 dòng duy nhất, dịu mắt, active mờ mượt */
+      :root {
+        --sidebar-width: 260px !important;
+      }
+      .sidebar {
+        width: 260px !important;
+        padding: 2rem 0.85rem !important;
+      }
+      .nav-item {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.65rem !important;
+        padding: 0.62rem 0.85rem !important;
+        white-space: nowrap !important;
+      }
+      .nav-icon {
+        flex-shrink: 0 !important;
+        font-size: 1.05rem !important;
+        line-height: 1 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+      }
+      .nav-label {
+        white-space: nowrap !important;
+        flex: 1 !important;
+        min-width: 0 !important;
+      }
+      .nav-hint {
+        flex-shrink: 0 !important;
+        margin-left: auto !important;
+        white-space: nowrap !important;
+      }
+
+      html.light-theme .nav-item {
+        color: #475569 !important;
+        font-weight: 650 !important;
+        background: transparent !important;
+        border: 1px solid transparent !important;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+
+      html.light-theme .nav-item:hover {
+        background: #f1f5f9 !important;
+        color: #1e293b !important;
+        transform: translateX(3px) !important;
+        border-color: #e2e8f0 !important;
+      }
+
+      html.light-theme .nav-item.is-active {
+        background: #eef2ff !important;
+        color: #4338ca !important;
+        font-weight: 750 !important;
+        border: 1px solid #c7d2fe !important;
+        box-shadow: 0 2px 8px -2px rgba(67, 56, 202, 0.12) !important;
+        transform: translateX(2px) !important;
+      }
+
+      html.light-theme .nav-item.is-active .nav-hint {
+        color: #6366f1 !important;
+        opacity: 0.9 !important;
+      }
+
+      html.light-theme .nav-hint {
+        color: #94a3b8 !important;
+        font-weight: 750 !important;
+      }
+
+      html.light-theme .nav-item:hover .nav-hint {
+        color: #64748b !important;
+      }
+
+      /* =========================================================
+         PREMIUM MICRO-ANIMATIONS SYSTEM (Mượt mà, sang xịn, tinh tế)
+         ========================================================= */
+
+      /* Custom spring deceleration curves */
+      :root {
+        --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+        --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+
+      @keyframes slideUpFade {
+        0% {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes fadeInSubtle {
+        0% {
+          opacity: 0;
+          transform: scale(0.985);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      /* Card Entry & Tactile Micro-Interactions */
+      .term-card,
+      .session-item,
+      .list-item,
+      .exam-item {
+        transition: transform 0.25s var(--ease-spring), 
+                    box-shadow 0.25s var(--ease-spring), 
+                    border-color 0.2s ease !important;
+        will-change: transform, box-shadow;
+      }
+
+      .session-item:hover,
+      .list-item:hover,
+      .term-card:hover {
+        transform: translateY(-2.5px) !important;
+      }
+
+      .session-item:active,
+      .list-item:active,
+      .term-card:active {
+        transform: translateY(-0.5px) scale(0.995) !important;
+        transition-duration: 0.08s !important;
+      }
+
+      /* Buttons: Tactile micro-press feedback */
+      .btn {
+        transition: transform 0.2s var(--ease-spring), 
+                    box-shadow 0.2s var(--ease-spring), 
+                    background-color 0.2s ease, 
+                    filter 0.2s ease !important;
+      }
+
+      .btn:active {
+        transform: scale(0.96) !important;
+        transition-duration: 0.08s !important;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-1.5px) !important;
+        box-shadow: 0 6px 18px -2px rgba(79, 70, 229, 0.35) !important;
+        filter: brightness(1.04) !important;
+      }
+
+      /* Controls, Inputs & Selects Smooth Focus Ring */
+      select, input {
+        transition: border-color 0.2s ease, box-shadow 0.2s var(--ease-spring), background-color 0.2s ease !important;
+      }
+
+      select:focus, input:focus {
+        border-color: #4f46e5 !important;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14) !important;
+      }
+
+      /* Header action buttons & icon buttons: Simple, subtle micro-interaction */
+      .icon-btn {
+        transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease !important;
+      }
+
+      .icon-btn:hover {
+        background: var(--surface-hover) !important;
+        transform: translateY(-1px) !important;
+      }
+
+      .icon-btn:active {
+        transform: translateY(0) scale(0.96) !important;
+      }
+
+      .user-btn,
+      .user-btn:hover,
+      .user-btn:active {
+        transform: none !important;
+      }
+
+      .user-btn:hover {
+        background: var(--surface-hover) !important;
+      }
+
+      .user-btn:active {
+        transform: scale(0.98) !important;
+      }
+
+      /* Navigation Items: Elegant hover slide */
+      .nav-item {
+        transition: transform 0.22s var(--ease-spring), 
+                    background-color 0.2s ease, 
+                    color 0.2s ease, 
+                    border-color 0.2s ease,
+                    box-shadow 0.2s ease !important;
+      }
+
+      .nav-item:hover {
+        transform: translateX(4px) !important;
+      }
+
+      .nav-item:active {
+        transform: translateX(2px) scale(0.98) !important;
+      }
+
+      /* Toolbar & Table Board entry animation */
+      .schedule-toolbar,
+      .week-grid-wrap,
+      .term-view {
+        animation: fadeInSubtle 0.35s var(--ease-spring) backwards;
+      }
+
+      /* Badges subtle lift */
+      .exam-badge,
+      .exam-credit-badge {
+        transition: transform 0.2s var(--ease-spring), filter 0.2s ease !important;
+      }
+
+      .exam-badge:hover,
+      .exam-credit-badge:hover {
+        transform: translateY(-1px) !important;
+        filter: brightness(1.06) !important;
+      }
+
+      /* Accessibility: Respect user motion preferences */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
     <script>
       (function() {
         try {
@@ -402,7 +881,6 @@
                   const room = pickFirstMeaningful(row, [idxRoom]);
                   const teacher = pickFirstMeaningful(row, [idxTeacher]);
                   const time = pickFirstMeaningful(row, [idxTime]);
-                  const mode = pickFirstMeaningful(row, [idxMode]);
                   const pStartRaw = idxPeriodStart >= 0 ? row[idxPeriodStart] || "-" : "-";
                   const pCountRaw = idxPeriodCount >= 0 ? row[idxPeriodCount] || "-" : "-";
                   const finalCourse = cleanCourseName(course || parsed.course || "");
@@ -410,6 +888,24 @@
                   const finalTeacher = teacher === "Đang cập nhật" ? parsed.teacher : teacher;
                   const finalPeriodStart = String(pStartRaw || "-").includes("-") ? String(pStartRaw).split("-")[0].trim() : pStartRaw || parsed.periodStart || "-";
                   const finalPeriodCount = pCountRaw && pCountRaw !== "-" ? pCountRaw : parsed.periodCount || "-";
+
+                  // Correctly determine Hình thức học: Never fallback to date or other columns!
+                  const rawMode = idxMode >= 0 && row[idxMode] ? String(row[idxMode]).trim() : "";
+                  const rawModeClean = rawMode && rawMode !== "-" && rawMode !== "Đang cập nhật" && !/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(rawMode) ? rawMode : (parsed.mode || "");
+                  const rawModeLower = rawModeClean.toLowerCase();
+                  const roomClean = String(finalRoom || "").trim();
+                  const hasRoom = roomClean && roomClean !== "-" && roomClean !== "Đang cập nhật" && !roomClean.toLowerCase().includes("online") && !roomClean.toLowerCase().includes("elearning");
+
+                  let finalMode = "Trực tiếp";
+                  if (rawModeLower.includes("elearning") || rawModeLower.includes("online") || rawModeLower.includes("trực tuyến")) {
+                    finalMode = "Elearning";
+                  } else if (rawModeLower.includes("trực tiếp") || rawModeLower.includes("offline")) {
+                    finalMode = "Trực tiếp";
+                  } else if (hasRoom) {
+                    finalMode = "Trực tiếp";
+                  } else {
+                    finalMode = "Elearning";
+                  }
                   
                   return {
                     id: index,
@@ -420,7 +916,7 @@
                     periodStart: sanitizeField(finalPeriodStart, parsed.periodStart || "-"),
                     periodCount: sanitizeField(finalPeriodCount, "-"),
                     time: sanitizeField(time, "-"),
-                    mode: sanitizeField(mode, parsed.mode || "").replace(/^h[oọ]c[:\s]*/i, ""),
+                    mode: finalMode,
                     session: idxSession >= 0 ? String(row[idxSession] || "").trim() : "",
                   };
                 }).filter((item) => {
@@ -566,32 +1062,36 @@
                                 <%
                                   const si = shiftFromPeriodStart(item.periodStart, item.session);
                                   const tietLabel = item.time && item.time !== '-' ? `Tiết ${item.time}` : `Ca ${si.shift}`;
+                                  const [tStart, tEnd] = getShiftTimeRange(item, shift);
+                                  const startISO = formatISODateTime(day.date, tStart);
+                                  const endISO = formatISODateTime(day.date, tEnd);
                                 %>
                                   <% const compactStyle = `style="--accent: ${accentFromText(item.course)}; min-height: 90px; display: flex; flex-direction: column; padding: 0.6rem;"`; %>
                                     <div
                                       class="session-item session-item--compact"
                                       <%- compactStyle %>
                                       data-search-content="<%= [item.course, item.teacher, item.room, item.day, item.date, item.time].join(' ').toLowerCase() %>"
-                                      data-target-time="<%= day.date ? (day.date.split('/').reverse().join('-') + 'T' + start.padStart(5, '0')) : '' %>"
+                                      data-target-time="<%= startISO %>"
+                                      data-end-time="<%= endISO %>"
                                     >
                                       <div class="session-item__top" style="flex-direction: column; align-items: flex-start; gap: 2px; margin-bottom: 6px;">
-                                        <div class="session-item__title" style="font-weight: 800; font-size: 0.88rem; line-height: 1.25; color: var(--text-main); width: 100%;"><%= item.course %></div>
-                                        <div class="countdown-tag" style="font-size: 0.65rem; font-weight: 700;" data-countdown-target></div>
+                                        <div class="session-item__title" style="font-weight: 850; font-size: 0.8rem; line-height: 1.35; color: var(--text-main); width: 100%;"><%= item.course %></div>
+                                        <div class="countdown-tag" style="font-size: 0.68rem; font-weight: 800;" data-countdown-target></div>
                                       </div>
                                       
-                                      <div class="session-item__sub" style="display: flex; flex-direction: column; gap: 2px; margin-top: auto; border-top: 1px dashed var(--line); padding-top: 4px;">
-                                        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
-                                          <span style="flex: 0 0 14px; opacity: 0.7;">📍</span>
-                                          <span style="flex: 1; color: var(--text-muted);"><%= item.room %></span>
+                                      <div class="session-item__sub" style="display: flex; flex-direction: column; gap: 3px; margin-top: auto; border-top: 1px solid var(--line); padding-top: 5px;">
+                                        <div style="display: flex; align-items: center; gap: 5px; font-size: 0.72rem;">
+                                          <span style="flex: 0 0 15px; font-size: 0.78rem;">📍</span>
+                                          <span style="flex: 1; color: var(--text-muted);">Phòng: <strong style="color: var(--text-main); font-weight: 850;"><%= item.room %></strong></span>
                                         </div>
-                                        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
-                                          <span style="flex: 0 0 14px; opacity: 0.7;">👤</span>
-                                          <span style="flex: 1; color: var(--text-muted);"><%= item.teacher %></span>
+                                        <div style="display: flex; align-items: center; gap: 5px; font-size: 0.72rem;">
+                                          <span style="flex: 0 0 15px; font-size: 0.78rem;">👤</span>
+                                          <span style="flex: 1; color: var(--text-muted); font-weight: 700;"><%= item.teacher %></span>
                                         </div>
                                         <% if (item.mode) { %>
-                                          <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
-                                            <span style="flex: 0 0 14px; opacity: 0.7;">📝</span>
-                                            <span style="flex: 1; color: var(--primary); font-weight: 700;"><%= item.mode %></span>
+                                          <div style="display: flex; align-items: center; gap: 5px; font-size: 0.72rem;">
+                                            <span style="flex: 0 0 15px; font-size: 0.78rem;">📝</span>
+                                            <span class="<%= item.mode === 'Trực tiếp' ? 'text-success' : 'text-primary' %>" style="flex: 1; font-weight: 800;"><%= item.mode %></span>
                                           </div>
                                         <% } %>
                                       </div>
@@ -632,14 +1132,20 @@
                     </header>
                     <div class="list-items">
                       <% day.items.forEach((item, index) => { %>
-                        <% const shiftInfo = shiftFromPeriodStart(item.periodStart, item.session); %>
-                        <% const listItemStyle = `style="--accent: ${accentFromText(item.course)}; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: ${index * 0.05}s;"`; %>
+                        <%
+                          const shiftInfo = shiftFromPeriodStart(item.periodStart, item.session);
+                          const [tStart, tEnd] = getShiftTimeRange(item, shiftInfo.shift);
+                          const startISO = formatISODateTime(day.date, tStart);
+                          const endISO = formatISODateTime(day.date, tEnd);
+                          const listItemStyle = `style="--accent: ${accentFromText(item.course)}; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) backwards; animation-delay: ${index * 0.05}s;"`;
+                        %>
                         <div
                           class="list-item"
                           <%- listItemStyle %>
                           data-search-content="<%= [item.course, item.teacher, item.room, item.day, item.date, item.time].join(' ').toLowerCase() %>"
                           data-day-index="<%= item.dayIndex || '' %>"
-                          data-target-time="<%= day.date ? (day.date.split('/').reverse().join('-') + 'T' + shiftInfo.range.split(' - ')[0].padStart(5, '0')) : '' %>"
+                          data-target-time="<%= startISO %>"
+                          data-end-time="<%= endISO %>"
                         >
                           <div class="list-item__left">
                             <div class="shift-name">Ca <%= shiftInfo.shift %></div>
@@ -648,7 +1154,7 @@
                           <div class="list-item__right">
                             <div class="list-item__top" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px;">
                                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                  <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--text-main);"><%= item.course %></h4>
+                                  <h4 style="margin: 0; font-size: 0.84rem; font-weight: 800; color: var(--text-main);"><%= item.course %></h4>
                                   <div class="countdown-tag" style="font-size: 0.65rem; font-weight: 700;" data-countdown-target></div>
                                 </div>
                                 <% if (item.time && item.time !== '-') { %>
@@ -670,7 +1176,7 @@
                               <% if (item.mode) { %>
                                 <div style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--text-muted);">
                                   <span style="opacity: 0.7;">📝</span>
-                                  <span>Hình thức: <strong style="color: var(--primary);"><%= item.mode %></strong></span>
+                                  <span>Hình thức: <strong class="<%= item.mode === 'Trực tiếp' ? 'text-success' : 'text-primary' %>" style="font-weight: 800;"><%= item.mode %></strong></span>
                                 </div>
                               <% } %>
                             </div>
@@ -729,7 +1235,7 @@
                 <%
                   const grouped = new Map();
                   semResult.rows.forEach(row => {
-                    let id = "", name = "", className = "", credits = "", fee = "", teacher = "", sched = "", room = "";
+                    let id = "", name = "", className = "", credits = "", fee = "", teacher = "", sched = "", room = "", mode = "";
 
                     if (row && typeof row === "object" && !Array.isArray(row)) {
                       id = row.id || "";
@@ -740,6 +1246,7 @@
                       teacher = row.teacher || "";
                       sched = row.sched || "";
                       room = row.room || "";
+                      mode = row.mode || "";
                     } else if (Array.isArray(row)) {
                       row.forEach(cell => {
                         let text = (cell || "").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]*>/g, "").replace(/\s*Có mặt\s*/gi, "").replace(/\s+/g, " ").trim();
@@ -748,7 +1255,9 @@
                         if (lower.includes("hoc binh thuong") || lower.includes("hoc lai") || lower.includes("hoc cai thien")) return;
                         const shiftParts = lower.split(" | ").map(x => x.trim());
                         if (shiftParts.length > 0 && shiftParts.every(x => ["sang", "chieu", "toi", "ca 1", "ca 2", "ca 3", "ca 4"].includes(x))) return;
-                        if (/^\d{1,3}([,.]\d{3})+$/.test(text)) { fee = text; }
+                        if (lower.includes("truc tiep") || lower.includes("offline")) { mode = "Trực tiếp"; }
+                        else if (lower.includes("elearning") || lower.includes("truc tuyen") || lower.includes("online")) { mode = "Elearning"; }
+                        else if (/^\d{1,3}([,.]\d{3})+$/.test(text)) { fee = text; }
                         else if (/\d{2}\/\d{2}\/\d{2,4}/.test(text) || lower.includes("thu ") || lower.includes("tiet ")) { sched = sched ? sched + " | " + text : text; }
                         else if (/toa nha|building|eaut|phong|tầng|tang/i.test(lower) || /^[A-Z]\d{2,3}$/.test(text)) { room = text; }
                         else if (text.includes(" - ") && /[A-Z0-9._]{5,}/.test(text)) {
@@ -772,21 +1281,29 @@
                     if (!room) room = "Đang cập nhật";
                     if (name === "Tổng số" || name === "Môn học") return;
 
+                    const rawRoomClean = (room || "").trim();
+                    const hasRoomInitial = rawRoomClean && rawRoomClean !== "-" && rawRoomClean !== "Đang cập nhật" && !rawRoomClean.toLowerCase().includes("online") && !rawRoomClean.toLowerCase().includes("elearning") && !rawRoomClean.toLowerCase().includes("e-learning");
+                    if (!mode) {
+                      mode = hasRoomInitial ? "Trực tiếp" : "Elearning";
+                    }
+
                     const hasValidFee = !!fee;
                     const key = deduplicate(name).toLowerCase();
                     let item;
                     if (!grouped.has(key)) {
-                      item = { id, name: deduplicate(name), className: deduplicate(className), credits, teacher: deduplicate(teacher), room: deduplicate(room), schedules: [], hasValidFee };
+                      item = { id, name: deduplicate(name), className: deduplicate(className), credits, teacher: deduplicate(teacher), room: deduplicate(room), mode: deduplicate(mode), schedules: [], hasValidFee };
                       grouped.set(key, item);
                     } else {
                       item = grouped.get(key);
                       if (hasValidFee && !item.hasValidFee) {
                         item.id = id; item.className = deduplicate(className); item.credits = credits;
                         item.teacher = deduplicate(teacher); item.room = deduplicate(room);
+                        if (mode) item.mode = deduplicate(mode);
                         item.schedules = []; item.hasValidFee = true;
                       } else if (!hasValidFee && item.hasValidFee) {
                         if (item.className !== deduplicate(className)) return;
                       } else if (item.className !== deduplicate(className)) { return; }
+                      if (mode === "Trực tiếp") item.mode = "Trực tiếp";
                     }
 
                     const sText = deduplicate(sched);
@@ -802,8 +1319,8 @@
                         let parsed = dates.map(d => { let [D, M, Y] = d.split("/"); if (Y.length === 2) Y = "20" + Y; return new Date(`${Y}-${M}-${D}`).getTime(); }).filter(n => !isNaN(n));
                         if (parsed.length > 0) {
                           let minDate = new Date(Math.min(...parsed)); let maxDate = new Date(Math.max(...parsed));
-                          let fMin = `${String(minDate.getDate()).padStart(2,'0')}/${String(minDate.getMonth()+1).padStart(2,'0')}/${String(minDate.getFullYear()).slice(-2)}`;
-                          let fMax = `${String(maxDate.getDate()).padStart(2,'0')}/${String(maxDate.getMonth()+1).padStart(2,'0')}/${String(maxDate.getFullYear()).slice(-2)}`;
+                          let fMin = `${String(minDate.getDate()).padStart(2,'0')}/${String(minDate.getMonth()+1).padStart(2,'0')}/${String(minDate.getFullYear())}`;
+                          let fMax = `${String(maxDate.getDate()).padStart(2,'0')}/${String(maxDate.getMonth()+1).padStart(2,'0')}/${String(maxDate.getFullYear())}`;
                           fullSched = `${fMin} → ${fMax}`;
                         } else { fullSched = sText ? sText.split(" | ")[0] : "Chưa có lịch"; }
                       } else if (dates.length === 1) {
@@ -854,6 +1371,21 @@
                         // Determine room display
                         let roomDisplay = item.schedules.some(s => s.includes('E-learning')) && item.room === 'Đang cập nhật' ? 'E-learning' : cleanField(item.room);
 
+                        const rClean = (roomDisplay || "").trim();
+                        const hasValidRoom = rClean && rClean !== "-" && rClean !== "Đang cập nhật" && !rClean.toLowerCase().includes("online") && !rClean.toLowerCase().includes("elearning") && !rClean.toLowerCase().includes("e-learning");
+
+                        let termMode = "Trực tiếp";
+                        const itemModeLower = (item.mode || "").toLowerCase();
+                        if (itemModeLower.includes("elearning") || itemModeLower.includes("online") || itemModeLower.includes("trực tuyến") || rClean.toLowerCase().includes("elearning") || rClean.toLowerCase().includes("e-learning")) {
+                          termMode = "Elearning";
+                        } else if (itemModeLower.includes("trực tiếp") || itemModeLower.includes("offline")) {
+                          termMode = "Trực tiếp";
+                        } else if (hasValidRoom) {
+                          termMode = "Trực tiếp";
+                        } else {
+                          termMode = "Elearning";
+                        }
+
                         // Schedule display
                         const hasNoSched = item.schedules.length === 0 || (item.schedules.length === 1 && item.schedules[0] === "Chưa có lịch");
                         const cardStyle = `style="--accent: ${accentColor}; animation: slideUp 0.5s cubic-bezier(0.23,1,0.32,1) backwards; animation-delay: ${cardIndex * 0.04}s;"`;
@@ -876,7 +1408,7 @@
                         </div>
 
                         <!-- Subject name -->
-                        <h3 style="margin: 0; font-size: 0.88rem; font-weight: 900; color: var(--text-main); line-height: 1.35; word-break: break-word; overflow-wrap: break-word;"><%= cleanField(item.name) %></h3>
+                        <h3 style="margin: 0; font-size: 0.86rem; font-weight: 800; color: var(--text-main); line-height: 1.35; word-break: break-word; overflow-wrap: break-word;"><%= cleanField(item.name) %></h3>
 
                         <!-- Meta info -->
                         <div style="display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.2rem;">
@@ -902,6 +1434,14 @@
                             <span style="flex-shrink: 0; opacity: 0.7; margin-top: 1px;">📍</span>
                             <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4; word-break: break-word;">
                               Phòng: <strong style="color: var(--text-main);"><%= roomDisplay %></strong>
+                            </div>
+                          </div>
+
+                          <!-- Mode / Hình thức -->
+                          <div style="display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.72rem;">
+                            <span style="flex-shrink: 0; opacity: 0.7; margin-top: 1px;">📝</span>
+                            <div style="flex: 1; min-width: 0; color: var(--text-muted); line-height: 1.4; word-break: break-word;">
+                              Hình thức: <strong class="<%= termMode === 'Trực tiếp' ? 'text-success' : 'text-primary' %>" style="font-weight: 800;"><%= termMode %></strong>
                             </div>
                           </div>
                         </div>
@@ -1000,13 +1540,59 @@
 
               <div class="term-layout">
                 <% sortedSemNames.forEach((semName, semIdx) => { %>
-                  <% const semIdxHeaderStyle = `style="margin-top: ${semIdx === 0 ? '0' : '2.5rem'}; padding-bottom: 0.6rem; border-bottom: 2px solid var(--primary); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;"`; %>
+                  <% const semIdxHeaderStyle = `style="margin-top: ${semIdx === 0 ? '0' : '2.25rem'}; padding-bottom: 0.6rem; border-bottom: 1.5px solid var(--line); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;"`; %>
                   <div <%- semIdxHeaderStyle %>>
-                    <h2 style="margin: 0; font-size: 1.1rem; font-weight: 900; color: var(--primary);"><%= semName %></h2>
-                    <span style="font-size: 0.75rem; color: var(--text-dim); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.25rem 0.75rem;">
-                      📝 Tổng: <strong style="color: var(--text-main);"><%= examSemesters[semName].length %></strong> môn thi
+                    <h2 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: var(--primary); letter-spacing: -0.015em;"><%= semName %></h2>
+                    <span style="font-size: 0.76rem; font-weight: 600; color: var(--text-muted); background: var(--surface); border: 1px solid var(--line); border-radius: 9999px; padding: 0.3rem 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: var(--shadow-sm);">
+                      📝 Tổng: <strong style="color: var(--text-main); font-weight: 800;"><%= examSemesters[semName].length %></strong> môn thi
                     </span>
                   </div>
+
+                  <%
+                    const getExamBadgeClass = (formatText, idx) => {
+                      const ft = (formatText || "").toLowerCase();
+                      if (ft.includes("trắc nghiệm")) {
+                        return idx % 2 === 0 ? "exam-badge--tn-0" : "exam-badge--tn-1";
+                      }
+                      if (ft.includes("tự luận")) {
+                        return idx % 2 === 0 ? "exam-badge--tl-0" : "exam-badge--tl-1";
+                      }
+                      if (ft.includes("bài tập lớn") || ft.includes("tiểu luận") || ft.includes("đồ án")) {
+                        return "exam-badge--btl";
+                      }
+                      if (ft.includes("vấn đáp") || ft.includes("thực hành")) {
+                        return "exam-badge--venda";
+                      }
+                      return "exam-badge--default";
+                    };
+                  %>
+
+                  <%
+                    const fallbackCreditsMap = {
+                      "toan roi rac": "3",
+                      "lich su dang cong san viet nam": "2",
+                      "lap trinh mang": "3",
+                      "phuong phap tinh toan toi uu": "3",
+                      "tu tuong ho chi minh": "2",
+                      "he quan tri csdl voi oracle": "3",
+                      "phan tich va thiet ke he thong": "3",
+                      "he thong thong tin quan ly": "3",
+                      "triet hoc mac - lenin": "3",
+                      "kinh te chinh tri mac - lenin": "2",
+                      "chu nghia xa hoi khoa hoc": "2",
+                      "tieng anh 1": "3",
+                      "tieng anh 2": "3",
+                      "tieng anh 3": "3",
+                      "giai tich 1": "3",
+                      "dai so tuyen tinh": "3",
+                      "vat ly dai cuong": "3",
+                      "lap trinh web": "3",
+                      "cau truc du lieu va giai thuat": "3",
+                      "kien truc may tinh": "3",
+                      "mang may tinh": "3",
+                      "he dieu hanh": "3",
+                    };
+                  %>
 
                   <div class="term-grid" style="margin-top: 1rem;">
                     <% examSemesters[semName].forEach((row, index) => {
@@ -1021,8 +1607,35 @@
                          let format = row[9] || "Thi kết thúc HP";
                          if (format === "-") format = "Thi kết thúc HP";
 
+                         let credits = row[10] || "";
+                         if (!credits && result.creditsMap) {
+                           const normSub = norm(subject);
+                           credits = result.creditsMap[normSub] || "";
+                           if (!credits) {
+                             for (const [k, v] of Object.entries(result.creditsMap)) {
+                               if (normSub.includes(k) || k.includes(normSub)) {
+                                 credits = v;
+                                 break;
+                               }
+                             }
+                           }
+                         }
+                         if (!credits) {
+                           const normSub = norm(subject);
+                           credits = fallbackCreditsMap[normSub] || "";
+                           if (!credits) {
+                             for (const [k, v] of Object.entries(fallbackCreditsMap)) {
+                               if (normSub.includes(k) || k.includes(normSub)) {
+                                 credits = v;
+                                 break;
+                               }
+                             }
+                           }
+                         }
+
                          // Robust date-time ISO string parsing for target countdown
                          let targetTimeISO = "";
+                         let targetEndTimeISO = "";
                          if (date && date !== "-") {
                            const parts = date.split('/');
                            if (parts.length === 3) {
@@ -1031,7 +1644,10 @@
                              const dd = parts[0].padStart(2, '0');
                              const isoDate = `${yyyy}-${mm}-${dd}`;
 
-                             const tStartRaw = (time || "").split("-")[0].replace(/h/gi, ":").trim();
+                             const timeParts = (time || "").split("-");
+                             const tStartRaw = timeParts[0].replace(/h/gi, ":").trim();
+                             const tEndRaw = timeParts[1] ? timeParts[1].replace(/h/gi, ":").trim() : "";
+
                              if (tStartRaw && tStartRaw !== "-") {
                                const [hStr, mStr] = tStartRaw.split(":");
                                const hh = String(parseInt(hStr) || 0).padStart(2, '0');
@@ -1039,6 +1655,13 @@
                                targetTimeISO = `${isoDate}T${hh}:${mmVal}:00`;
                              } else {
                                targetTimeISO = `${isoDate}T08:00:00`;
+                             }
+
+                             if (tEndRaw && tEndRaw !== "-") {
+                               const [hStr, mStr] = tEndRaw.split(":");
+                               const hh = String(parseInt(hStr) || 0).padStart(2, '0');
+                               const mmVal = String(parseInt(mStr) || 0).padStart(2, '0');
+                               targetEndTimeISO = `${isoDate}T${hh}:${mmVal}:00`;
                              }
                            }
                          }
@@ -1050,37 +1673,43 @@
                         <%- examStyle %>
                         data-search-content="<%= [subject, room, sbd, date, format].join(' ').toLowerCase() %>"
                         data-target-time="<%= targetTimeISO %>"
+                        data-end-time="<%= targetEndTimeISO %>"
                       >
-                        <div class="term-card-header" style="margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-                          <span class="course-badge" style="background: var(--accent); color: white; padding: 0.2rem 0.55rem; font-size: 0.62rem; border-radius: 6px; font-weight: 900; line-height: 1.2; text-transform: uppercase;">
+                        <div class="term-card-header" style="margin-bottom: 0.45rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+                          <span class="course-badge exam-badge <%= getExamBadgeClass(format, index) %>">
                             <%= format %>
                           </span>
+                          <% if (credits) { %>
+                            <span class="exam-credit-badge">
+                              <%= credits %> tín
+                            </span>
+                          <% } %>
                         </div>
                         
-                        <h3 style="margin: 0; font-size: 0.88rem; font-weight: 900; color: var(--text-main); line-height: 1.35; word-break: break-word; overflow-wrap: break-word;"><%= subject %></h3>
+                        <h3 style="margin: 0.4rem 0 0.3rem 0; font-size: 0.85rem; font-weight: 850; color: var(--text-main); line-height: 1.35; word-break: break-word; overflow-wrap: break-word;"><%= subject %></h3>
                         
-                        <div class="exam-meta-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.6rem; margin-top: 0.5rem; border-top: 1px solid var(--line); padding-top: 0.45rem;">
-                          <div style="display: flex; align-items: center; gap: 4px; font-size: 0.72rem;">
-                            <span style="opacity: 0.7; flex-shrink: 0;">📍</span>
-                            <span style="color: var(--text-muted); min-width: 0; word-break: break-all;">Phòng: <strong style="color: var(--text-main);"><%= room %></strong></span>
+                        <div class="exam-meta-grid" style="display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 0.75rem; margin-top: 0.5rem; border-top: 1px solid var(--line); padding-top: 0.5rem;">
+                          <div style="display: flex; align-items: center; gap: 5px; font-size: 0.72rem; white-space: nowrap;">
+                            <span style="flex-shrink: 0;">📍</span>
+                            <span style="color: var(--text-muted); white-space: nowrap;">Phòng: <strong style="color: var(--text-main); font-weight: 850;"><%= room %></strong></span>
                           </div>
-                          <div style="display: flex; align-items: center; gap: 4px; font-size: 0.72rem;">
-                            <span style="opacity: 0.7; flex-shrink: 0;">🏷️</span>
-                            <span style="color: var(--text-muted); min-width: 0;">SBD: <strong style="color: var(--primary); font-weight: 900;"><%= sbd %></strong></span>
+                          <div style="display: flex; align-items: center; gap: 5px; font-size: 0.72rem; white-space: nowrap;">
+                            <span style="flex-shrink: 0;">🏷️</span>
+                            <span style="color: var(--text-muted); white-space: nowrap;">SBD: <strong class="<%= sbd !== '-' ? 'text-primary' : 'text-muted' %>" style="font-weight: 900;"><%= sbd %></strong></span>
                           </div>
-                          <div style="display: flex; align-items: center; gap: 4px; font-size: 0.72rem;">
-                            <span style="opacity: 0.7; flex-shrink: 0;">📅</span>
-                            <span style="color: var(--text-muted); min-width: 0;">Ngày: <strong style="color: var(--text-main);"><%= date %></strong></span>
+                          <div style="display: flex; align-items: center; gap: 5px; font-size: 0.72rem; white-space: nowrap;">
+                            <span style="flex-shrink: 0;">📅</span>
+                            <span style="color: var(--text-muted); white-space: nowrap;">Ngày: <strong style="color: var(--text-main); font-weight: 850;"><%= date %></strong></span>
                           </div>
-                          <div style="display: flex; align-items: center; gap: 4px; font-size: 0.72rem;">
-                            <span style="opacity: 0.7; flex-shrink: 0;">🕒</span>
-                            <span style="color: var(--text-muted); min-width: 0;">Giờ: <strong style="color: var(--text-main);"><%= time %><% if (shift && shift !== '-') { %> (<%= shift %>)<% } %></strong></span>
+                          <div style="display: flex; align-items: center; gap: 5px; font-size: 0.72rem; white-space: nowrap;">
+                            <span style="flex-shrink: 0;">🕒</span>
+                            <span style="color: var(--text-muted); white-space: nowrap;">Giờ: <strong style="color: var(--text-main); font-weight: 850;"><%= time %><% if (shift && shift !== '-') { %> (<%= shift %>)<% } %></strong></span>
                           </div>
                         </div>
                         
-                        <div class="term-schedule" style="margin-top: auto; padding: 0.4rem 0.5rem; border-top: 1px dashed var(--line); margin-top: 0.5rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.68rem; font-weight: 700; color: var(--text-dim);">
+                        <div class="exam-card-footer" style="margin-top: auto; margin-top: 0.85rem; border-radius: 8px; padding: 0.45rem 0.85rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; font-weight: 700;">
                           <span>Lần <%= attempt %><% if (phase && phase !== '-') { %> · Đợt <%= phase %><% } %></span>
-                          <div class="countdown-tag" style="font-size: 0.65rem; font-weight: 800;" data-countdown-target></div>
+                          <div class="countdown-tag" style="font-size: 0.72rem; font-weight: 800; background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important;" data-countdown-target></div>
                         </div>
                       </div>
                     <% }) %>
@@ -1217,7 +1846,7 @@
       }
     </style>
 
-    <script src="/app.js"></script>
+    <script src="/app.js?v=2.1"></script>
     <script>
       // Quick refresh logic
       const refreshBtn = document.getElementById('refreshBtn');
@@ -1255,49 +1884,68 @@
     </script>
   
   <script>
-    // Countdown Timer Logic
+    // Countdown Timer & Real-Time Shift Status Logic
     function updateCountdowns() {
       const now = new Date();
       document.querySelectorAll('[data-target-time]').forEach(el => {
         const targetStr = el.getAttribute('data-target-time');
+        const endStr = el.getAttribute('data-end-time');
         const display = el.querySelector('[data-countdown-target]');
         if (!targetStr || !display) return;
 
         const target = new Date(targetStr);
-        const diff = target - now;
+        if (isNaN(target.getTime())) return;
 
-        if (diff <= 0) {
-          const endTarget = new Date(target);
-          endTarget.setHours(endTarget.getHours() + 2.5); // Assume 2.5 hours duration
-          if (now < endTarget) {
-            display.innerText = '● Đang diễn ra';
-            display.style.color = '#ff9f43';
-          } else {
-            display.innerText = '✓ Đã kết thúc';
-            display.style.color = 'var(--text-dim)';
-            display.style.opacity = '0.6';
-          }
+        let endTarget = endStr ? new Date(endStr) : null;
+        if (!endTarget || isNaN(endTarget.getTime())) {
+          // Fallback: 150 minutes (2.5 hours) after start time
+          endTarget = new Date(target.getTime() + 150 * 60 * 1000);
+        }
+
+        const diffStart = target.getTime() - now.getTime();
+        const diffEnd = endTarget.getTime() - now.getTime();
+
+        // Reset state classes
+        display.classList.remove('is-upcoming', 'is-ongoing', 'is-ended');
+
+        // 1. Session has ended (current time >= end time)
+        if (diffEnd <= 0) {
+          display.innerText = '✓ Đã kết thúc';
+          display.title = `Đã kết thúc lúc ${endTarget.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+          display.classList.add('is-ended');
           return;
         }
 
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        // 2. Session is currently ongoing (diffStart <= 0 and diffEnd > 0)
+        if (diffStart <= 0) {
+          const minsRemaining = Math.max(1, Math.ceil(diffEnd / (1000 * 60)));
+          display.innerText = '● Đang diễn ra';
+          display.title = `Đang diễn ra (kết thúc lúc ${endTarget.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, còn khoảng ${minsRemaining} phút)`;
+          display.classList.add('is-ongoing');
+          return;
+        }
+
+        // 3. Session is upcoming (diffStart > 0)
+        display.classList.add('is-upcoming');
+        const days = Math.floor(diffStart / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diffStart % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const mins = Math.floor((diffStart % (1000 * 60 * 60)) / (1000 * 60));
 
         let text = '⏳ Còn ';
         if (days > 0) text += `${days}n `;
         if (hours > 0 || days > 0) text += `${hours}g `;
         text += `${mins}p`;
+        if (days === 0 && hours === 0 && mins === 0) {
+          text = '⏳ Sắp diễn ra';
+        }
 
         display.innerText = text;
-        const container = display.closest('.term-card, .session-item, .list-item, .exam-item');
-        const accent = container?.style?.getPropertyValue('--accent');
-        display.style.color = accent || 'var(--primary)';
+        display.title = `Bắt đầu lúc ${target.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
       });
     }
 
-    // Run every minute
-    setInterval(updateCountdowns, 60000);
+    // Run every 10 seconds for real-time responsiveness
+    setInterval(updateCountdowns, 10000);
     // Initial run
     updateCountdowns();
   </script>
