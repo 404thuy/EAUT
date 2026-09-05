@@ -2,6 +2,12 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
+const isServerless =
+  process.env.VERCEL === "1" ||
+  Boolean(process.env.VERCEL_ENV) ||
+  Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+  (process.env.NODE_ENV === "production" && process.platform === "linux");
+
 // ─── Cache Management & Change Detection ──────────────────────────────
 const scheduleCache = new Map();
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes TTL
@@ -47,11 +53,6 @@ async function getBrowser() {
   if (_browser && _browser.connected) return _browser;
 
   const execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
-  const isServerless =
-    process.env.VERCEL === "1" ||
-    Boolean(process.env.VERCEL_ENV) ||
-    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
-    (process.env.NODE_ENV === "production" && process.platform === "linux");
 
   if (execPath) {
     // ── Docker / Railway / Render: dùng Chrome hệ thống ──────────────
@@ -95,11 +96,20 @@ async function getBrowser() {
     }
 
     _browser = await puppeteerCore.launch({
-      args: chromium.args,
+      args: [
+        ...chromium.args,
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+      ],
       defaultViewport: chromium.defaultViewport || { width: 1280, height: 800 },
       executablePath: executablePath,
       headless: "shell",
       ignoreHTTPSErrors: true,
+    });
+
+    _browser.on("disconnected", () => {
+      console.log("[BROWSER] Chromium disconnected, resetting singleton.");
+      _browser = null;
     });
   } else {
     // ── Local dev: dùng puppeteer bình thường ─────────────────────────
@@ -193,16 +203,34 @@ async function createAuthenticatedPage(username, password) {
 
   for (let attempt = 1; attempt <= MAX_LOGIN_RETRIES; attempt++) {
     const browser = await getBrowser();
-    const context = typeof browser.createBrowserContext === "function"
-      ? await browser.createBrowserContext()
-      : typeof browser.createIncognitoBrowserContext === "function"
-        ? await browser.createIncognitoBrowserContext()
-        : browser.defaultBrowserContext();
-
-    const page = await context.newPage();
-    await page.setViewport({ width: 1280, height: 800 });
+    let context = null;
+    let page;
 
     try {
+      if (isServerless) {
+        // Trong môi trường serverless: dùng trực tiếp page của default context
+        // KHÔNG gọi createBrowserContext vì Chromium --single-process sẽ gây "Protocol error (Target.createTarget): Target closed"
+        const pages = await browser.pages();
+        page = pages.length > 0 ? pages[0] : await browser.newPage();
+
+        // Xóa sạch cookie & cache cho phiên mới
+        const client = await page.target().createCDPSession().catch(() => null);
+        if (client) {
+          await client.send("Network.clearBrowserCookies").catch(() => {});
+          await client.send("Network.clearBrowserCache").catch(() => {});
+          await client.detach().catch(() => {});
+        }
+      } else {
+        context = typeof browser.createBrowserContext === "function"
+          ? await browser.createBrowserContext()
+          : typeof browser.createIncognitoBrowserContext === "function"
+            ? await browser.createIncognitoBrowserContext()
+            : browser.defaultBrowserContext();
+        page = await context.newPage();
+      }
+
+      await page.setViewport({ width: 1280, height: 800 });
+
       // 1. Navigate to login page naturally (full JS/CSS bundles)
       await page.goto("https://qldt.eaut.edu.vn/congthongtin/login.aspx#diemhoc", {
         waitUntil: "domcontentloaded",
@@ -267,8 +295,12 @@ async function createAuthenticatedPage(username, password) {
       console.log(`[AUTH SUCCESS] Logged in for ${studentName || username} (${username}) (attempt ${attempt})`);
       return { browserContext: context, page, studentName };
     } catch (error) {
-      await page.close().catch(() => { });
-      await context.close().catch(() => { });
+      if (!isServerless && page) await page.close().catch(() => { });
+      if (context) await context.close().catch(() => { });
+
+      if (_browser && !_browser.connected) {
+        _browser = null;
+      }
 
       if (error.message.includes("Đăng nhập thất bại")) {
         throw error;
@@ -1061,8 +1093,16 @@ async function prefetchAllStudentData(username, password, options = {}) {
 
       return weeklyResult;
     } finally {
-      if (page) await page.close().catch(() => { });
-      if (browserContext) await browserContext.close().catch(() => { });
+      if (isServerless) {
+        if (page && !page.isClosed()) {
+          try {
+            await page.goto("about:blank").catch(() => {});
+          } catch (e) { }
+        }
+      } else {
+        if (page) await page.close().catch(() => { });
+        if (browserContext) await browserContext.close().catch(() => { });
+      }
     }
   });
 }
@@ -1104,8 +1144,16 @@ async function getStudentTermSchedule(username, password, options = {}) {
       setCache(specificKey, result);
       return filterResultsBySemester(result, preferredSemester);
     } finally {
-      if (page) await page.close().catch(() => { });
-      if (browserContext) await browserContext.close().catch(() => { });
+      if (isServerless) {
+        if (page && !page.isClosed()) {
+          try {
+            await page.goto("about:blank").catch(() => {});
+          } catch (e) { }
+        }
+      } else {
+        if (page) await page.close().catch(() => { });
+        if (browserContext) await browserContext.close().catch(() => { });
+      }
     }
   });
 }
@@ -1132,8 +1180,16 @@ async function getStudentExamSchedule(username, password, options = {}) {
       setCache(specificKey, result);
       return filterResultsBySemester(result, preferredSemester);
     } finally {
-      if (page) await page.close().catch(() => { });
-      if (browserContext) await browserContext.close().catch(() => { });
+      if (isServerless) {
+        if (page && !page.isClosed()) {
+          try {
+            await page.goto("about:blank").catch(() => {});
+          } catch (e) { }
+        }
+      } else {
+        if (page) await page.close().catch(() => { });
+        if (browserContext) await browserContext.close().catch(() => { });
+      }
     }
   });
 }
