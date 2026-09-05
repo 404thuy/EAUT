@@ -24,8 +24,8 @@ app.use(
   })
 );
 
-app.get("/favicon.ico", (req, res) => res.sendFile(path.join(__dirname, "public", "favicon.svg")));
-app.get("/favicon.png", (req, res) => res.sendFile(path.join(__dirname, "public", "favicon.svg")));
+app.get("/favicon.ico", (req, res) => res.sendFile(path.join(__dirname, "public", "logo.png")));
+app.get("/favicon.png", (req, res) => res.sendFile(path.join(__dirname, "public", "logo.png")));
 
 
 // Enable caching for static assets while keeping schedule pages fresh
@@ -45,7 +45,16 @@ app.get("/health", (req, res) => {
   res.send("Server is healthy");
 });
 
-app.get("/", (_req, res) => {
+app.get("/ping", (_req, res) => {
+  res.header("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.header("Pragma", "no-cache");
+  res.status(200).send("pong");
+});
+
+app.get("/", (req, res) => {
+  if (req.session?.studentLogin?.username && req.session?.studentLogin?.password) {
+    return res.redirect("/schedule/week");
+  }
   res.render("index", {
     error: null,
     result: null,
@@ -233,7 +242,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-if (!process.env.VERCEL && process.env.NODE_ENV !== "production") {
+if (!process.env.VERCEL) {
   app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
   });

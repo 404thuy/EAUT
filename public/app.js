@@ -11,6 +11,7 @@ const setSidebarOpen = (isOpen) => {
   sidebar.classList.toggle("is-open", isOpen);
   sidebarBackdrop?.classList.toggle("is-open", isOpen);
   sidebarToggle?.setAttribute("aria-expanded", String(isOpen));
+  sidebarToggle?.classList.toggle("is-active", isOpen);
 };
 
 if (sidebarToggle && sidebar) {
@@ -170,5 +171,162 @@ if (togglePasswordBtn && passwordInput) {
     const newLabel = isPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu";
     togglePasswordBtn.setAttribute("aria-label", newLabel);
     togglePasswordBtn.setAttribute("title", newLabel);
+  });
+}
+
+// Game Ping / Real-time Latency Indicator
+const pingBadge = $("#pingBadge");
+const pingText = $("#pingText");
+
+if (pingBadge && pingText) {
+  let isPinging = false;
+  let liveTimerInterval = null;
+
+  const updatePingUI = (ms) => {
+    pingBadge.classList.remove("is-good", "is-medium", "is-poor", "is-measuring");
+    if (ms === null || isNaN(ms)) {
+      pingText.textContent = "-- ms";
+      pingBadge.title = "Mất kết nối máy chủ";
+      pingBadge.classList.add("is-poor");
+      return;
+    }
+    pingText.textContent = `${ms} ms`;
+    pingBadge.title = `Độ trễ máy chủ: ${ms}ms`;
+    if (ms < 150) {
+      pingBadge.classList.add("is-good");
+    } else if (ms < 400) {
+      pingBadge.classList.add("is-medium");
+    } else {
+      pingBadge.classList.add("is-poor");
+    }
+  };
+
+  // 1. Calculate the exact real latency experienced by the user on this page load / reload
+  let realLatency = null;
+  const actionStart = sessionStorage.getItem("eaut_action_start");
+
+  if (actionStart) {
+    const diff = Date.now() - parseInt(actionStart, 10);
+    sessionStorage.removeItem("eaut_action_start");
+    if (diff > 0 && diff < 120000) {
+      realLatency = diff;
+    }
+  }
+
+  // Fallback to Navigation Timing API if actionStart was not present
+  if (!realLatency && window.performance) {
+    const navEntries = performance.getEntriesByType("navigation");
+    if (navEntries && navEntries.length > 0) {
+      const nav = navEntries[0];
+      if (nav.responseEnd && nav.requestStart && (nav.responseEnd - nav.requestStart) > 0) {
+        realLatency = Math.round(nav.responseEnd - nav.requestStart);
+      } else if (nav.duration && nav.duration > 0) {
+        realLatency = Math.round(nav.duration);
+      }
+    }
+    if (!realLatency && performance.timing) {
+      const t = performance.timing;
+      if (t.responseEnd && t.requestStart && (t.responseEnd - t.requestStart) > 0) {
+        realLatency = t.responseEnd - t.requestStart;
+      }
+    }
+  }
+
+  if (!realLatency) {
+    realLatency = Math.max(1, Math.round(performance.now()));
+  }
+
+  // Set initial UI with true page load latency
+  updatePingUI(realLatency);
+
+  // If page finishes loading completely and wasn't a manual click action, refine with full navigation duration
+  if (!actionStart) {
+    window.addEventListener("load", () => {
+      const navEntries = performance.getEntriesByType("navigation");
+      if (navEntries && navEntries.length > 0 && navEntries[0].duration > 0) {
+        updatePingUI(Math.round(navEntries[0].duration));
+      }
+    });
+  }
+
+  // 2. Global tracker function to update live counter during reload / navigation
+  window.startLiveLatencyTracker = () => {
+    const startTime = Date.now();
+    sessionStorage.setItem("eaut_action_start", startTime.toString());
+
+    if (liveTimerInterval) clearInterval(liveTimerInterval);
+    pingBadge.classList.remove("is-good", "is-poor");
+    pingBadge.classList.add("is-medium");
+
+    const loadingTimer = document.getElementById("loadingTimer");
+
+    liveTimerInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      pingText.textContent = `${elapsed} ms`;
+      if (loadingTimer) {
+        loadingTimer.textContent = `Đang xử lý: ${elapsed} ms`;
+      }
+      if (elapsed >= 400) {
+        pingBadge.classList.remove("is-medium");
+        pingBadge.classList.add("is-poor");
+      }
+    }, 25);
+  };
+
+  // Attach tracker to all navigation links
+  document.querySelectorAll("a[href]").forEach((link) => {
+    const href = link.getAttribute("href");
+    if (href && !href.startsWith("#") && !href.startsWith("javascript:") && !link.target) {
+      link.addEventListener("click", () => {
+        if (!link.hasAttribute("download")) {
+          window.startLiveLatencyTracker();
+        }
+      });
+    }
+  });
+
+  // Attach tracker to page unload (F5 or browser reload)
+  window.addEventListener("beforeunload", () => {
+    if (!sessionStorage.getItem("eaut_action_start")) {
+      sessionStorage.setItem("eaut_action_start", Date.now().toString());
+    }
+  });
+
+  // 3. Ping measurement function (Real-time Round-trip Latency)
+  const measurePing = async () => {
+    if (isPinging || document.hidden) return;
+    isPinging = true;
+
+    const startTime = performance.now();
+    try {
+      const resp = await fetch("/ping?t=" + Date.now(), { 
+        cache: "no-store", 
+        method: "GET",
+        headers: { "Cache-Control": "no-cache" }
+      });
+      if (resp.ok) {
+        const elapsed = Math.max(1, Math.round(performance.now() - startTime));
+        updatePingUI(elapsed);
+      } else {
+        updatePingUI(null);
+      }
+    } catch {
+      updatePingUI(null);
+    } finally {
+      isPinging = false;
+    }
+  };
+
+  // 4. Continuously auto-update ping every 2.5 seconds without user interaction
+  let pingInterval = setInterval(measurePing, 2500);
+
+  // Pause pinging when tab is hidden, resume immediately when tab becomes visible
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      if (pingInterval) clearInterval(pingInterval);
+    } else {
+      measurePing();
+      pingInterval = setInterval(measurePing, 2500);
+    }
   });
 }

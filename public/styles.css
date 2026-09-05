@@ -37,6 +37,10 @@
   --text-dim: rgba(246, 248, 255, 0.45);
   --line: rgba(170, 185, 255, 0.12);
   --line-bright: rgba(170, 185, 255, 0.25);
+  --card-bg: #1a2246;
+  --card-border: rgba(170, 185, 255, 0.24);
+  --card-hover: #212b57;
+  --card-hover-border: rgba(170, 185, 255, 0.45);
   --shadow-md: 0 12px 30px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
@@ -50,6 +54,10 @@ html.light-theme {
   --surface: #ffffff !important;
   --surface-solid: #ffffff !important;
   --surface-hover: #f9fafb !important;
+  --card-bg: #ffffff !important;
+  --card-border: rgba(0, 0, 0, 0.12) !important;
+  --card-hover: #f8fafc !important;
+  --card-hover-border: rgba(67, 56, 202, 0.3) !important;
   --primary: #4338ca !important; /* Stronger indigo */
   --primary-glow: rgba(67, 56, 202, 0.1) !important;
   --text-main: #0f172a !important; /* Near black */
@@ -67,8 +75,16 @@ html.light-theme .session-item,
 html.light-theme .list-item,
 html.light-theme .card,
 html.light-theme .nav-card {
+  background: #ffffff !important;
   border: 1px solid var(--line) !important;
   box-shadow: var(--shadow-md) !important;
+}
+
+html.light-theme .session-item:hover,
+html.light-theme .list-item:hover,
+html.light-theme .term-card:hover {
+  background: #f8fafc !important;
+  border-color: rgba(67, 56, 202, 0.3) !important;
 }
 
 html.light-theme .countdown-tag {
@@ -208,17 +224,27 @@ html, body {
   text-decoration: none;
   margin-bottom: 2rem;
   padding: 0 0.25rem;
+  cursor: default;
+  user-select: none;
 }
 
 .brand-badge {
-  background: linear-gradient(135deg, var(--primary), var(--accent-purple));
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 15px var(--primary-glow);
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.brand-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .sidebar-title {
@@ -335,14 +361,23 @@ html.light-theme .site-header {
   justify-content: space-between;
   width: 100%;
   gap: 0.5rem;
+  flex-wrap: nowrap;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   min-width: 0;
   flex: 1;
+}
+
+.header-brand-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .header-title {
@@ -350,8 +385,7 @@ html.light-theme .site-header {
   font-size: 1rem;
   color: var(--text-main);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.25;
 }
 
 .header-subtitle {
@@ -360,28 +394,37 @@ html.light-theme .site-header {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.45rem;
   flex-shrink: 0;
+}
+
+.header-tools-group {
+  display: flex;
+  align-items: center;
+  gap: 0.12rem;
 }
 
 .icon-btn {
   background: transparent;
   border: none;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-md);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform var(--transition), opacity var(--transition);
-  font-size: 1.4rem;
+  transition: transform var(--transition), background var(--transition), opacity var(--transition);
+  font-size: 1.25rem;
   color: var(--text-main);
+  flex-shrink: 0;
+  padding: 0;
 }
 
 .icon-btn:hover {
@@ -389,14 +432,92 @@ html.light-theme .site-header {
   transform: translateY(-1px);
 }
 
+.icon-btn:active {
+  transform: scale(0.94);
+}
+
 .theme-icon-dark { color: #f39c12; }
 .theme-icon-light { color: #f1c40f; }
+
+/* Game Ping Indicator */
+.ping-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--text-muted);
+  cursor: default;
+  user-select: none;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.ping-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+  display: inline-block;
+  flex-shrink: 0;
+  transition: background 0.3s, box-shadow 0.3s;
+  animation: pingPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pingPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+
+.ping-badge.is-good .ping-dot {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+}
+.ping-badge.is-good .ping-text {
+  color: #10b981;
+}
+
+.ping-badge.is-medium .ping-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
+}
+.ping-badge.is-medium .ping-text {
+  color: #f59e0b;
+}
+
+.ping-badge.is-poor .ping-dot {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+}
+.ping-badge.is-poor .ping-text {
+  color: #ef4444;
+}
+
+.ping-badge.is-measuring .ping-dot {
+  background: #3b82f6;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.8);
+  animation: pingPulse 0.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.ping-badge.is-measuring .ping-text {
+  color: #60a5fa;
+}
+
+html.light-theme .ping-badge {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.12);
+}
 
 .user-btn {
   background: transparent !important;
   border-radius: var(--radius-md) !important;
-  padding: 0.4rem 0.75rem !important;
-  gap: 0.75rem !important;
+  padding: 0.25rem 0.5rem !important;
+  gap: 0.45rem !important;
   box-shadow: none !important;
   border: none !important;
   height: auto !important;
@@ -409,28 +530,34 @@ html.light-theme .site-header {
   background: var(--surface) !important;
 }
 
+.user-info-text,
 .user-btn div {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  text-align: right; /* Align name/ID to the right as per image 2 logic usually */
+  text-align: right;
+  min-width: 0;
 }
 
+.user-name,
 .user-btn div div:first-child {
   color: var(--text-main) !important;
   font-weight: 800 !important;
   font-size: 0.95rem !important;
   white-space: nowrap;
-  max-width: 200px;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
+  padding-right: 5px;
 }
 
+.user-mssv,
 .user-btn div div:last-child {
   color: var(--text-muted) !important;
   font-size: 0.8rem !important;
   font-weight: 600 !important;
   white-space: nowrap;
+  padding-right: 5px;
 }
 
 .user-btn .user-icon-svg {
@@ -834,19 +961,20 @@ select, input {
 
 /* Session Item */
 .session-item {
-  background: var(--bg-main);
-  border-left: 3px solid var(--accent, var(--primary));
-  padding: 0.6rem;
+  background: var(--card-bg, #1a2246);
+  border: 1px solid var(--card-border, rgba(170, 185, 255, 0.24));
+  padding: 0.65rem;
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--transition), opacity var(--transition);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform var(--transition), background var(--transition), border-color var(--transition), box-shadow var(--transition);
   cursor: default;
 }
 
 .session-item:hover {
   transform: scale(1.02);
-  box-shadow: var(--shadow-md);
-  background: var(--surface-hover);
+  background: var(--card-hover, #212b57);
+  border-color: var(--card-hover-border, rgba(170, 185, 255, 0.45));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 .session-item__top {
@@ -897,22 +1025,38 @@ select, input {
 .si-room { color: var(--accent-blue); }
 
 /* Responsive / Hamburger */
-.hamburger {
-  display: none;
-  background: none;
+.hamburger-btn {
+  display: none !important;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   border: none;
-  padding: 10px;
+  background: transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-main);
   cursor: pointer;
+  transition: background var(--transition), transform var(--transition), color var(--transition);
 }
 
-.hamburger span {
+.hamburger-btn:hover {
+  background: var(--surface);
+}
+
+.hamburger-btn:active,
+.hamburger-btn.is-active {
+  background: var(--surface-hover);
+  transform: scale(0.94);
+}
+
+.hamburger-svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  stroke-width: 2.2;
   display: block;
-  width: 24px;
-  height: 2px;
-  background: var(--text-main);
-  margin: 5px 0;
-  border-radius: 2px;
-  transition: 0.3s;
 }
 
 @media (max-width: 1024px) {
@@ -927,8 +1071,8 @@ select, input {
     left: 0;
   }
   
-  .hamburger {
-    display: block;
+  .hamburger-btn {
+    display: inline-flex !important;
   }
   
   .page-content {
@@ -1024,20 +1168,21 @@ select, input {
 }
 
 .list-item {
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--card-bg, #1a2246);
+  border: 1px solid var(--card-border, rgba(170, 185, 255, 0.24));
   border-radius: var(--radius-md);
   padding: 1rem;
   display: flex;
   gap: 1.25rem;
-  transition: transform var(--transition), opacity var(--transition);
-  border-left: 4px solid var(--accent, var(--primary));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform var(--transition), background var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
 
 .list-item:hover {
   transform: translateX(5px);
-  background: var(--surface-hover);
-  border-color: var(--line-bright);
+  background: var(--card-hover, #212b57);
+  border-color: var(--card-hover-border, rgba(170, 185, 255, 0.45));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 .list-item__left {
@@ -1107,12 +1252,12 @@ select, input {
 }
 
 .term-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--card-bg, #1a2246);
+  border: 1px solid var(--card-border, rgba(170, 185, 255, 0.24));
   border-radius: var(--radius-md);
   padding: 0.85rem;
-  border-left: 4px solid var(--accent, var(--primary));
-  transition: transform var(--transition), opacity var(--transition);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform var(--transition), background var(--transition), border-color var(--transition), box-shadow var(--transition);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -1125,8 +1270,9 @@ select, input {
 
 .term-card:hover {
   transform: translateY(-4px);
-  background: var(--surface-hover);
-  box-shadow: var(--shadow-md);
+  background: var(--card-hover, #212b57);
+  border-color: var(--card-hover-border, rgba(170, 185, 255, 0.45));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 .term-card__header {
@@ -1253,20 +1399,71 @@ select {
   white-space: nowrap;
 }
 
+@media (max-width: 640px) {
+  .site-header {
+    padding: 0 0.5rem;
+  }
+  .header-left {
+    gap: 0.35rem;
+  }
+  .header-title {
+    font-size: 0.95rem;
+  }
+  .header-actions {
+    gap: 0.3rem;
+  }
+  .user-btn {
+    padding: 0.2rem 0.35rem !important;
+    gap: 0.35rem !important;
+  }
+  .user-name,
+  .user-btn div div:first-child {
+    max-width: 140px !important;
+    padding-right: 4px !important;
+  }
+}
+
 @media (max-width: 480px) {
+  .site-header {
+    padding: 0 0.5rem;
+  }
+  .user-info-text,
   .user-btn div {
     display: none !important;
   }
+  .user-btn {
+    padding: 0 !important;
+    width: 36px !important;
+    height: 36px !important;
+    justify-content: center !important;
+  }
   .header-title {
-    font-size: 0.9rem;
+    font-size: 0.88rem;
+  }
+  .header-subtitle {
+    font-size: 0.65rem;
   }
   .header-actions {
-    gap: 0.4rem;
+    gap: 0.35rem;
   }
-  .icon-btn {
-    width: 32px;
-    height: 32px;
-    font-size: 1.2rem;
+  .ping-badge {
+    padding: 0.22rem 0.45rem;
+    font-size: 0.65rem;
+    gap: 0.3rem;
+  }
+  .ping-dot {
+    width: 6px;
+    height: 6px;
+  }
+  .icon-btn,
+  .hamburger-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 1.15rem;
+  }
+  .hamburger-svg {
+    width: 20px;
+    height: 20px;
   }
   .term-grid {
     grid-template-columns: 1fr; /* 1 column on mobile for more space */
