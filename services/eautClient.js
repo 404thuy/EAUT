@@ -1,3 +1,4 @@
+const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
@@ -46,7 +47,11 @@ async function getBrowser() {
   if (_browser && _browser.connected) return _browser;
 
   const execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
-  const isProduction = process.env.NODE_ENV === "production";
+  const isServerless =
+    process.env.VERCEL === "1" ||
+    Boolean(process.env.VERCEL_ENV) ||
+    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+    (process.env.NODE_ENV === "production" && process.platform === "linux");
 
   if (execPath) {
     // ── Docker / Railway / Render: dùng Chrome hệ thống ──────────────
@@ -65,19 +70,34 @@ async function getBrowser() {
         "--ignore-certificate-errors",
       ],
     });
-  } else if (isProduction) {
-    // ── Production (Vercel): dùng Chromium dành cho serverless ──
-    console.log("[BROWSER] Production mode - using @sparticuz/chromium");
+  } else if (isServerless) {
+    // ── Production (Vercel / AWS Lambda): dùng Chromium dành cho serverless ──
+    console.log("[BROWSER] Serverless mode - using @sparticuz/chromium");
 
     const { default: chromium } = await import("@sparticuz/chromium");
     const { default: puppeteerCore } = await import("puppeteer-core");
 
-    chromium.setGraphicsMode(false);
+    // Tắt đồ họa WebGL để tiết kiệm RAM và giảm thời gian giải nén
+    chromium.setGraphicsMode = false;
+
+    const CHROMIUM_PACK_URL =
+      process.env.CHROMIUM_PACK_URL ||
+      "https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.tar";
+
+    let executablePath;
+    const defaultBin = path.join(process.cwd(), "node_modules", "@sparticuz", "chromium", "bin");
+
+    if (fs.existsSync(defaultBin)) {
+      executablePath = await chromium.executablePath();
+    } else {
+      console.log("[BROWSER] Local Chromium binary not packaged, fetching remote pack...");
+      executablePath = await chromium.executablePath(CHROMIUM_PACK_URL);
+    }
 
     _browser = await puppeteerCore.launch({
       args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
+      defaultViewport: chromium.defaultViewport || { width: 1280, height: 800 },
+      executablePath: executablePath,
       headless: "shell",
       ignoreHTTPSErrors: true,
     });

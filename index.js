@@ -15,6 +15,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: false }));
 app.set("trust proxy", 1); 
 
+
 app.use(
   cookieSession({
     name: "eaut-session",
@@ -232,7 +233,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-if (process.env.NODE_ENV !== "production") {
+if (!process.env.VERCEL && process.env.NODE_ENV !== "production") {
   app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
   });
