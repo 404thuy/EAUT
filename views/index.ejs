@@ -631,6 +631,7 @@
           </div>
 
           <nav class="sidebar-nav" aria-label="Menu">
+            <% if (result) { %>
             <a class="nav-item <%= (!result || (result.viewType !== 'term' && result.viewType !== 'exam')) ? 'is-active' : '' %>" href="/schedule/week" data-nav-item="weekly">
               <span class="nav-icon" aria-hidden="true">🗓️</span>
               <span class="nav-label">Lịch học tuần</span>
@@ -646,17 +647,42 @@
               <span class="nav-label">Lịch thi</span>
               <span class="nav-hint">Exams</span>
             </a>
-            <a class="nav-item" href="https://qldt.eaut.edu.vn/congthongtin/login.aspx#diemhoc" target="_blank" rel="noreferrer" data-nav-item="link">
+            <% } else { %>
+            <div class="sidebar-login-guide">
+              <div class="login-guide-header">
+                <span class="guide-bulb" aria-hidden="true">💡</span>
+                <span>Hỗ trợ đăng nhập</span>
+              </div>
+              <div class="login-guide-content">
+                <p class="guide-lead">Nếu nhập đúng thông tin nhưng <strong>không đăng nhập được</strong>:</p>
+                <div class="guide-step">
+                  <span class="step-badge">1</span>
+                  <span>Nhấn vào <strong>Cổng EAUT</strong> bên dưới để thử đăng nhập trực tiếp.</span>
+                </div>
+                <div class="guide-step">
+                  <span class="step-badge">2</span>
+                  <span>Nếu hệ thống hiển thị <strong class="badge-tag-no">NO</strong>, hãy chọn <strong>Đổi mật khẩu</strong> tại cổng.</span>
+                </div>
+                <div class="guide-step">
+                  <span class="step-badge">3</span>
+                  <span>Sau khi đổi xong, quay lại <strong>xemlichnhanh</strong> để đăng nhập tiếp nhé!</span>
+                </div>
+              </div>
+            </div>
+            <% } %>
+            <a class="nav-item <%= !result ? 'portal-nav-btn' : '' %>" href="https://qldt.eaut.edu.vn/congthongtin/login.aspx#diemhoc" target="_blank" rel="noreferrer" data-nav-item="link">
               <span class="nav-icon" aria-hidden="true">🔗</span>
               <span class="nav-label">Cổng EAUT</span>
-              <span class="nav-hint">Link</span>
+              <span class="nav-hint">Mở cổng ↗</span>
             </a>
           </nav>
 
           <div class="sidebar-footer">
+            <% if (result) { %>
             <div class="cute-tip">
               Mẹo nhỏ: bạn có thể lọc nhanh theo <strong>môn/phòng/giảng viên</strong> và chuyển chế độ xem bảng khi cần.
             </div>
+            <% } %>
           </div>
         </aside>
 
@@ -1801,7 +1827,7 @@
         <div class="spinner"></div>
         <p>Đang đồng bộ dữ liệu...</p>
         <span class="loading-tip">Hệ thống đang cào dữ liệu trực tiếp từ cổng EAUT, vui lòng chờ giây lát.</span>
-        <div id="loadingTimer" class="loading-timer" style="margin-top: 0.85rem; font-size: 0.95rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: #a5b4fc; font-weight: 700; letter-spacing: 0.03em;">Đang xử lý: 0 ms</div>
+        <div id="loadingTimer" class="loading-timer" style="margin-top: 0.85rem; font-size: 0.95rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: #a5b4fc; font-weight: 700; letter-spacing: 0.03em;">Ước tính: ~3 giây</div>
       </div>
     </div>
 

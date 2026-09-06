@@ -270,6 +270,11 @@ if (pingBadge && pingText) {
     sessionStorage.removeItem("eaut_action_start");
     if (diff > 0 && diff < 120000) {
       realLatency = diff;
+      try {
+        const prev = parseInt(localStorage.getItem("eaut_avg_crawl_time") || "3500", 10);
+        const calibrated = Math.round(prev * 0.35 + diff * 0.65);
+        localStorage.setItem("eaut_avg_crawl_time", calibrated.toString());
+      } catch (e) {}
     }
   }
 
@@ -320,17 +325,39 @@ if (pingBadge && pingText) {
 
     const loadingTimer = document.getElementById("loadingTimer");
 
+    // Dynamic countdown timer for login / synchronization
+    let estimatedMs = 3500;
+    try {
+      const savedDuration = parseInt(localStorage.getItem("eaut_avg_crawl_time") || "3500", 10);
+      if (savedDuration >= 2000 && savedDuration <= 8000) {
+        estimatedMs = savedDuration;
+      }
+    } catch (e) {}
+
+    const updateCountdown = (elapsed) => {
+      if (!loadingTimer) return;
+      const remainingMs = estimatedMs - elapsed;
+      if (remainingMs > 1000) {
+        const sec = Math.ceil(remainingMs / 1000);
+        loadingTimer.textContent = `Ước tính: ${sec} giây`;
+      } else if (remainingMs > 0) {
+        loadingTimer.textContent = `Ước tính: 1 giây`;
+      } else {
+        loadingTimer.textContent = `Ước tính: gần xong...`;
+      }
+    };
+
+    updateCountdown(0);
+
     liveTimerInterval = setInterval(() => {
       const elapsed = Date.now() - startTime;
       pingText.textContent = `${elapsed} ms`;
-      if (loadingTimer) {
-        loadingTimer.textContent = `Đang xử lý: ${elapsed} ms`;
-      }
+      updateCountdown(elapsed);
       if (elapsed >= 400) {
         pingBadge.classList.remove("is-medium");
         pingBadge.classList.add("is-poor");
       }
-    }, 25);
+    }, 50);
   };
 
   // Attach tracker to all navigation links

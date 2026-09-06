@@ -606,6 +606,136 @@ html.light-theme .nav-item:hover .nav-hint {
   color: #64748b !important;
 }
 
+/* Sidebar Login Guide (Hỗ trợ đăng nhập khi chưa đăng nhập) */
+.sidebar-login-guide {
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  border-radius: 14px;
+  padding: 0.9rem 0.85rem;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+html.light-theme .sidebar-login-guide {
+  background: #f8faff !important;
+  border: 1.5px solid #dbeafe !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.06) !important;
+}
+
+.login-guide-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #a5b4fc;
+}
+
+html.light-theme .login-guide-header {
+  color: #4338ca !important;
+}
+
+.login-guide-header .guide-bulb {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.login-guide-content .guide-lead {
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  margin-bottom: 0.55rem;
+}
+
+html.light-theme .login-guide-content .guide-lead {
+  color: #475569 !important;
+}
+
+.guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.74rem;
+  line-height: 1.42;
+  color: var(--text-main);
+  margin-bottom: 0.45rem;
+}
+
+.guide-step:last-child {
+  margin-bottom: 0;
+}
+
+html.light-theme .guide-step {
+  color: #334155 !important;
+}
+
+.step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.22);
+  color: #a5b4fc;
+  font-size: 0.68rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+html.light-theme .step-badge {
+  background: #e0e7ff !important;
+  color: #4338ca !important;
+}
+
+.badge-tag-no {
+  display: inline-block;
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  font-weight: 800;
+  font-size: 0.72rem;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+html.light-theme .badge-tag-no {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fecaca !important;
+}
+
+.portal-nav-btn {
+  background: rgba(99, 102, 241, 0.12) !important;
+  border: 1px solid rgba(99, 102, 241, 0.28) !important;
+  color: #a5b4fc !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+}
+
+.portal-nav-btn:hover {
+  background: rgba(99, 102, 241, 0.22) !important;
+  color: #ffffff !important;
+  border-color: #818cf8 !important;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25) !important;
+}
+
+html.light-theme .portal-nav-btn {
+  background: #eff6ff !important;
+  border: 1.5px solid #bfdbfe !important;
+  color: #2563eb !important;
+}
+
+html.light-theme .portal-nav-btn:hover {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+  border-color: #93c5fd !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15) !important;
+}
+
 .sidebar-footer {
   margin-top: auto;
   padding-top: 1.5rem;
