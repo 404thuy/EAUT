@@ -390,3 +390,44 @@ if (pingBadge && pingText) {
     }
   });
 }
+
+// --- Smart Background Hydration & Hardware Acceleration ---
+(function initBackgroundHydration() {
+  const metaEl = document.getElementById("eautAppMeta");
+  const user = metaEl ? metaEl.getAttribute("data-user") : (window.__EAUT_USER__ || null);
+  const viewType = metaEl ? metaEl.getAttribute("data-view-type") : (window.__EAUT_VIEW_TYPE__ || "week");
+  if (!user) return;
+
+  // When student is viewing weekly schedule, quietly prefetch Term and Exam into server & disk cache
+  if (viewType === "week" || !viewType) {
+    const triggerPrefetch = () => {
+      // 1. Prefetch Term schedule
+      fetch("/api/schedule/term", { headers: { "X-Requested-With": "XMLHttpRequest" } })
+        .then((res) => res.json())
+        .then((json) => {
+          if (json && json.success) {
+            console.log("[Prefetch] Term schedule ready in background cache.");
+          }
+        })
+        .catch(() => {});
+
+      // 2. Prefetch Exam schedule
+      setTimeout(() => {
+        fetch("/api/schedule/exam", { headers: { "X-Requested-With": "XMLHttpRequest" } })
+          .then((res) => res.json())
+          .then((json) => {
+            if (json && json.success) {
+              console.log("[Prefetch] Exam schedule ready in background cache.");
+            }
+          })
+          .catch(() => {});
+      }, 1500);
+    };
+
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(triggerPrefetch, { timeout: 3000 });
+    } else {
+      setTimeout(triggerPrefetch, 1000);
+    }
+  }
+})();

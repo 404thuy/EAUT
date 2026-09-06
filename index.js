@@ -13,7 +13,7 @@ app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: false }));
-app.set("trust proxy", 1); 
+app.set("trust proxy", 1);
 
 
 app.use(
@@ -80,7 +80,7 @@ app.post("/schedule", async (req, res) => {
   }
 
   try {
-    const result = await prefetchAllStudentData(formData.username, formData.password, {
+    const result = await getStudentSchedule(formData.username, formData.password, {
       preferredWeek: req.body.week || null,
       strictWeek: false,
       useCache: false, // Force fresh crawl per account on login!
@@ -254,6 +254,84 @@ app.get("/schedule/all", async (req, res) => {
       result: null,
       formData: { username: saved.username, password: saved.password },
     });
+  }
+});
+
+app.get("/api/schedule/term", async (req, res) => {
+  const selectedSemester = req.query.semester || "";
+  const saved = req.session.studentLogin;
+
+  if (!saved?.username || !saved?.password) {
+    return res.status(401).json({ success: false, error: "Chưa đăng nhập" });
+  }
+
+  try {
+    const isAll = selectedSemester === "all";
+    const result = await getStudentTermSchedule(saved.username, saved.password, {
+      preferredSemester: isAll ? "" : selectedSemester,
+      fetchAll: isAll,
+      useCache: !req.query.refresh,
+    });
+    return res.json({
+      success: true,
+      result: { ...result, viewType: "term", selectedSemester },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/schedule/exam", async (req, res) => {
+  const selectedSemester = req.query.semester || "all";
+  const saved = req.session.studentLogin;
+
+  if (!saved?.username || !saved?.password) {
+    return res.status(401).json({ success: false, error: "Chưa đăng nhập" });
+  }
+
+  try {
+    const isAll = selectedSemester === "all";
+    const [result, termResult] = await Promise.all([
+      getStudentExamSchedule(saved.username, saved.password, {
+        preferredSemester: isAll ? "" : selectedSemester,
+        fetchAll: isAll,
+        useCache: !req.query.refresh,
+      }),
+      getStudentTermSchedule(saved.username, saved.password, {
+        fetchAll: true,
+        useCache: true,
+      }).catch(() => null),
+    ]);
+
+    const creditsMap = {};
+    if (termResult && Array.isArray(termResult.results)) {
+      termResult.results.forEach((sem) => {
+        (sem.rows || []).forEach((row) => {
+          if (Array.isArray(row)) {
+            let cName = "", cCredits = "";
+            row.forEach((cell) => {
+              const text = String(cell || "").replace(/<[^>]*>/g, "").trim();
+              if (/^\d{1,2}$/.test(text) && !cCredits && Number(text) >= 1 && Number(text) <= 10) {
+                cCredits = text;
+              } else if (!cName && text.length > 3 && !/^\d+$/.test(text) && !text.includes("/") && !text.toLowerCase().includes("học kỳ")) {
+                cName = text;
+              }
+            });
+            if (cName && cCredits) {
+              const normKey = cName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").trim();
+              creditsMap[normKey] = cCredits;
+            }
+          }
+        });
+      });
+    }
+
+    return res.json({
+      success: true,
+      result: { ...result, viewType: "exam", selectedSemester, creditsMap },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 

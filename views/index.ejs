@@ -1846,7 +1846,10 @@
       }
     </style>
 
-    <script src="/app.js?v=2.1"></script>
+    <% if (result) { %>
+    <div id="eautAppMeta" data-user="<%= (formData && formData.username) ? formData.username : '' %>" data-view-type="<%= (result && result.viewType) ? result.viewType : 'week' %>" style="display:none;" aria-hidden="true"></div>
+    <% } %>
+    <script src="/app.js?v=2.2"></script>
     <script>
       // Quick refresh logic
       const refreshBtn = document.getElementById('refreshBtn');

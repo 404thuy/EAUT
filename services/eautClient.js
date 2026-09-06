@@ -10,7 +10,42 @@ const isServerless =
 
 // ─── Cache Management & Change Detection ──────────────────────────────
 const scheduleCache = new Map();
-const CACHE_TTL = 15 * 60 * 1000; // 15 minutes TTL
+const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours TTL
+
+const CACHE_DIR = isServerless ? path.join("/tmp", "eaut_cache") : path.join(process.cwd(), ".cache");
+try {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+} catch (e) {}
+
+function getDiskCache(key) {
+  try {
+    const safeKey = crypto.createHash("md5").update(key).digest("hex");
+    const filePath = path.join(CACHE_DIR, `${safeKey}.json`);
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, "utf8");
+      const entry = JSON.parse(content);
+      if (Date.now() - entry.timestamp <= CACHE_TTL) {
+        return entry.data;
+      }
+      fs.unlinkSync(filePath);
+    }
+  } catch (e) {}
+  return null;
+}
+
+function setDiskCache(key, data) {
+  try {
+    const safeKey = crypto.createHash("md5").update(key).digest("hex");
+    const filePath = path.join(CACHE_DIR, `${safeKey}.json`);
+    const entry = {
+      timestamp: Date.now(),
+      data,
+    };
+    fs.writeFileSync(filePath, JSON.stringify(entry), "utf8");
+  } catch (e) {}
+}
 
 function computeHash(obj) {
   try {
@@ -26,12 +61,18 @@ function cacheKey(username, type, options) {
 
 function getFromCache(key) {
   const entry = scheduleCache.get(key);
-  if (!entry) return null;
-  if (Date.now() - entry.timestamp > CACHE_TTL) {
+  if (entry) {
+    if (Date.now() - entry.timestamp <= CACHE_TTL) {
+      return entry.data;
+    }
     scheduleCache.delete(key);
-    return null;
   }
-  return entry.data;
+  const diskData = getDiskCache(key);
+  if (diskData) {
+    scheduleCache.set(key, { data: diskData, timestamp: Date.now() });
+    return diskData;
+  }
+  return null;
 }
 
 function setCache(key, data) {
@@ -45,6 +86,7 @@ function setCache(key, data) {
     },
   };
   scheduleCache.set(key, { data: enrichedData, timestamp: Date.now(), hash: dataHash });
+  setDiskCache(key, enrichedData);
 }
 
 // ─── Puppeteer Singleton Browser Management ────────────────────────────
@@ -1469,7 +1511,26 @@ async function getStudentSchedule(username, password, options = {}) {
     if (cached) return cached;
   }
 
-  return prefetchAllStudentData(username, password, options);
+  return enqueueTask(async () => {
+    let browserContext, page, studentName;
+    try {
+      ({ browserContext, page, studentName } = await createAuthenticatedPage(username, password));
+      const weeklyResult = await fetchWeeklyScheduleInternal(page, username, studentName, options);
+      setCache(key, weeklyResult);
+      return weeklyResult;
+    } finally {
+      if (isServerless) {
+        if (page && !page.isClosed()) {
+          try {
+            await page.goto("about:blank").catch(() => {});
+          } catch (e) { }
+        }
+      } else {
+        if (page) await page.close().catch(() => { });
+        if (browserContext) await browserContext.close().catch(() => { });
+      }
+    }
+  });
 }
 
 async function getStudentTermSchedule(username, password, options = {}) {
