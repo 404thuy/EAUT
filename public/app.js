@@ -271,7 +271,7 @@ if (pingBadge && pingText) {
     if (diff > 0 && diff < 120000) {
       realLatency = diff;
       try {
-        const prev = parseInt(localStorage.getItem("eaut_avg_crawl_time") || "3500", 10);
+        const prev = parseInt(localStorage.getItem("eaut_avg_crawl_time") || "8000", 10);
         const calibrated = Math.round(prev * 0.35 + diff * 0.65);
         localStorage.setItem("eaut_avg_crawl_time", calibrated.toString());
       } catch (e) {}
@@ -325,11 +325,11 @@ if (pingBadge && pingText) {
 
     const loadingTimer = document.getElementById("loadingTimer");
 
-    // Dynamic countdown timer for login / synchronization
-    let estimatedMs = 3500;
+    // Dynamic countdown timer for login / synchronization (default ~8s for production web crawls)
+    let estimatedMs = 8000;
     try {
-      const savedDuration = parseInt(localStorage.getItem("eaut_avg_crawl_time") || "3500", 10);
-      if (savedDuration >= 2000 && savedDuration <= 8000) {
+      const savedDuration = parseInt(localStorage.getItem("eaut_avg_crawl_time") || "8000", 10);
+      if (savedDuration >= 3000 && savedDuration <= 15000) {
         estimatedMs = savedDuration;
       }
     } catch (e) {}
