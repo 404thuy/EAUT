@@ -215,28 +215,49 @@ function enqueueTask(fn) {
 
 // ─── Request Interception for Speed Optimization ───────────────────────
 async function setupPageInterception(page) {
-  await page.setRequestInterception(true);
+  if (!page || page.isClosed() || page._hasInterception) return;
+  page._hasInterception = true;
+  await page.setRequestInterception(true).catch(() => {});
   page.on("request", (req) => {
-    const resourceType = req.resourceType();
-    const url = req.url().toLowerCase();
+    try {
+      if (req.isInterceptResolutionHandled && req.isInterceptResolutionHandled()) return;
+      const resourceType = req.resourceType();
+      const url = req.url().toLowerCase();
 
-    // Block non-essential media, fonts, styles & tracking
-    if (
-      resourceType === "image" ||
-      resourceType === "font" ||
-      resourceType === "media" ||
-      url.includes("google-analytics") ||
-      url.includes("firebase") ||
-      url.includes("socket.io") ||
-      url.includes("mathjax") ||
-      url.includes("slick") ||
-      url.includes("swiper")
-    ) {
-      req.abort();
-    } else {
-      req.continue();
-    }
+      // Block non-essential media, fonts, styles & tracking
+      if (
+        resourceType === "image" ||
+        resourceType === "font" ||
+        resourceType === "media" ||
+        url.includes("google-analytics") ||
+        url.includes("firebase") ||
+        url.includes("socket.io") ||
+        url.includes("mathjax") ||
+        url.includes("slick") ||
+        url.includes("swiper")
+      ) {
+        req.abort().catch(() => {});
+      } else {
+        req.continue().catch(() => {});
+      }
+    } catch (e) {}
   });
+}
+
+async function cleanupPage(page, browserContext) {
+  if (isServerless) {
+    if (page && !page.isClosed()) {
+      try {
+        page.removeAllListeners("request");
+        await page.setRequestInterception(false).catch(() => {});
+        page._hasInterception = false;
+        await page.goto("about:blank").catch(() => {});
+      } catch (e) {}
+    }
+  } else {
+    if (page) await page.close().catch(() => {});
+    if (browserContext) await browserContext.close().catch(() => {});
+  }
 }
 
 // ─── Core: Login and Prepare an Authenticated Page ─────────────────────
@@ -254,6 +275,11 @@ async function createAuthenticatedPage(username, password) {
         // KHÔNG gọi createBrowserContext vì Chromium --single-process sẽ gây "Protocol error (Target.createTarget): Target closed"
         const pages = await browser.pages();
         page = pages.length > 0 ? pages[0] : await browser.newPage();
+
+        // Reset request interception & listeners từ phiên trước để tránh Request already handled / block script
+        page.removeAllListeners("request");
+        await page.setRequestInterception(false).catch(() => {});
+        page._hasInterception = false;
 
         // Xóa sạch cookie & cache cho phiên mới
         const client = await page.target().createCDPSession().catch(() => null);
@@ -294,6 +320,13 @@ async function createAuthenticatedPage(username, password) {
           page.click('#cms_authenticate_do_login'),
           page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 25000 }).catch(() => { }),
         ]);
+
+        // Đợi chuyển hướng rời khỏi login.aspx sang Index.aspx (nếu có)
+        await page.waitForFunction(
+          () => !window.location.pathname.toLowerCase().includes("login.aspx") ||
+                (window.edu && window.edu.system && window.edu.system.userId),
+          { timeout: 15000 }
+        ).catch(() => {});
       }
 
       // 2. Wait up to 15s for SPA framework & userId initialization
@@ -337,8 +370,7 @@ async function createAuthenticatedPage(username, password) {
       console.log(`[AUTH SUCCESS] Logged in for ${studentName || username} (${username}) (attempt ${attempt})`);
       return { browserContext: context, page, studentName };
     } catch (error) {
-      if (!isServerless && page) await page.close().catch(() => { });
-      if (context) await context.close().catch(() => { });
+      await cleanupPage(page, context);
 
       if (_browser && !_browser.connected) {
         _browser = null;
@@ -361,11 +393,26 @@ async function createAuthenticatedPage(username, password) {
 
 // ─── Helper: Call SPA internal API via page.evaluate ───────────────────
 async function callSPAApi(page, apiAction, apiFunc, params = {}) {
+  // Ensure the page has the SPA framework initialized
+  const isReady = await page.waitForFunction(
+    () => window.edu && window.edu.system && typeof window.edu.system.makeRequest === "function",
+    { timeout: 12000 }
+  ).then(() => true).catch(() => false);
+
+  if (!isReady) {
+    const currentUrl = page.url();
+    console.error(`[SPA API ERROR] SPA framework not ready on URL: ${currentUrl}`);
+    if (currentUrl.includes("login.aspx")) {
+      throw new Error("Phiên đăng nhập đã hết hạn hoặc chưa hoàn tất. Vui lòng thử lại.");
+    }
+    throw new Error("Hệ thống cổng trường đang phản hồi chậm. Vui lòng thử lại sau ít giây.");
+  }
+
   return await page.evaluate(
     async (action, func, extraParams) => {
       return new Promise((resolve, reject) => {
-        if (!window.edu || !window.edu.system || !window.edu.system.makeRequest) {
-          reject(new Error("SPA framework not initialized"));
+        if (!window.edu || !window.edu.system || typeof window.edu.system.makeRequest !== "function") {
+          reject(new Error("Hệ thống cổng trường chưa sẵn sàng. Vui lòng thử lại."));
           return;
         }
         const requestData = {
@@ -393,7 +440,7 @@ async function callSPAApi(page, apiAction, apiFunc, params = {}) {
           false,
           null
         );
-        setTimeout(() => resolve({ Success: false, Data: [] }), 12000);
+        setTimeout(() => resolve({ Success: false, Data: [] }), 15000);
       });
     },
     apiAction,
@@ -1486,16 +1533,7 @@ async function prefetchAllStudentData(username, password, options = {}) {
 
       return weeklyResult;
     } finally {
-      if (isServerless) {
-        if (page && !page.isClosed()) {
-          try {
-            await page.goto("about:blank").catch(() => {});
-          } catch (e) { }
-        }
-      } else {
-        if (page) await page.close().catch(() => { });
-        if (browserContext) await browserContext.close().catch(() => { });
-      }
+      await cleanupPage(page, browserContext);
     }
   });
 }
@@ -1519,16 +1557,7 @@ async function getStudentSchedule(username, password, options = {}) {
       setCache(key, weeklyResult);
       return weeklyResult;
     } finally {
-      if (isServerless) {
-        if (page && !page.isClosed()) {
-          try {
-            await page.goto("about:blank").catch(() => {});
-          } catch (e) { }
-        }
-      } else {
-        if (page) await page.close().catch(() => { });
-        if (browserContext) await browserContext.close().catch(() => { });
-      }
+      await cleanupPage(page, browserContext);
     }
   });
 }
@@ -1556,16 +1585,7 @@ async function getStudentTermSchedule(username, password, options = {}) {
       setCache(specificKey, result);
       return filterResultsBySemester(result, preferredSemester);
     } finally {
-      if (isServerless) {
-        if (page && !page.isClosed()) {
-          try {
-            await page.goto("about:blank").catch(() => {});
-          } catch (e) { }
-        }
-      } else {
-        if (page) await page.close().catch(() => { });
-        if (browserContext) await browserContext.close().catch(() => { });
-      }
+      await cleanupPage(page, browserContext);
     }
   });
 }
@@ -1592,16 +1612,7 @@ async function getStudentExamSchedule(username, password, options = {}) {
       setCache(specificKey, result);
       return filterResultsBySemester(result, preferredSemester);
     } finally {
-      if (isServerless) {
-        if (page && !page.isClosed()) {
-          try {
-            await page.goto("about:blank").catch(() => {});
-          } catch (e) { }
-        }
-      } else {
-        if (page) await page.close().catch(() => { });
-        if (browserContext) await browserContext.close().catch(() => { });
-      }
+      await cleanupPage(page, browserContext);
     }
   });
 }

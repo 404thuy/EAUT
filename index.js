@@ -95,10 +95,14 @@ app.post("/schedule", async (req, res) => {
     return res.redirect("/schedule/week");
   } catch (error) {
     console.error("SCHEDULE POST ERROR:", error);
-    const isLoginError = error.message && (error.message.includes("Đăng nhập thất bại") || error.message.includes("Vui lòng nhập"));
+    let msg = error.message || "Không thể lấy lịch học từ hệ thống EAUT.";
+    if (msg.includes("SPA framework not initialized") || msg.includes("pptr:evaluate") || msg.includes("/var/task")) {
+      msg = "Hệ thống cổng trường EAUT phản hồi chậm hoặc đang bận. Bạn vui lòng bấm Đồng bộ lịch học lại lần nữa nhé!";
+    }
+    const isLoginError = msg.includes("Đăng nhập thất bại") || msg.includes("Vui lòng nhập");
     const statusCode = isLoginError ? 400 : 500;
     return res.status(statusCode).render("index", {
-      error: error.message || "Không thể lấy lịch học từ hệ thống EAUT.",
+      error: msg,
       result: null,
       formData: { username: formData.username, password: formData.password },
     });
