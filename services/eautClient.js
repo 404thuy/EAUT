@@ -1532,6 +1532,7 @@ async function prefetchAllStudentData(username, password, options = {}) {
       // 1. Fetch Weekly Schedule
       const weeklyResult = await fetchWeeklyScheduleInternal(page, username, studentName, options);
       setCache(weeklyKey, weeklyResult);
+      setCache(cacheKey(username, "weekly", { preferredWeek, preferredSemester, strictWeek: !strictWeek }), weeklyResult);
 
       // 2. Fetch & Cache Term Schedule
       try {
@@ -1549,6 +1550,7 @@ async function prefetchAllStudentData(username, password, options = {}) {
       try {
         const examResult = await fetchExamScheduleInternal(page, username, studentName, { fetchAll: true, preferredSemester: "all" });
         setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "all" }), examResult);
+        setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "" }), examResult);
         setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "all" }), examResult);
         setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "" }), examResult);
         console.log(`[PREFETCH BATCH] Exam schedule cached successfully for ${username}`);
@@ -1584,50 +1586,9 @@ async function getStudentSchedule(username, password, options = {}) {
       if (!preferredWeek && !preferredSemester) {
         setCache(keyAlt, weeklyResult);
       }
-
-      if (options.backgroundHydrate !== false) {
-        // Tận dụng chính phiên page này để cào ngầm luôn Term và Exam trong background
-        (async () => {
-          try {
-            console.log(`[BACKGROUND PIPELINE] Đang cào ngầm Term & Exam cho ${username}...`);
-            // 1. Cào Lịch học kỳ
-            try {
-              const termResult = await fetchTermScheduleInternal(page, username, studentName, { fetchAll: true });
-              setCache(cacheKey(username, "term", { fetchAll: false, preferredSemester: "" }), termResult);
-              setCache(cacheKey(username, "term", { fetchAll: true, preferredSemester: "" }), termResult);
-              setCache(cacheKey(username, "term", { fetchAll: false, preferredSemester: "all" }), termResult);
-              setCache(cacheKey(username, "term", { fetchAll: true, preferredSemester: "all" }), termResult);
-              console.log(`[BACKGROUND PIPELINE] ✓ Đã lưu Lịch học kỳ cho ${username}`);
-            } catch (errTerm) {
-              console.warn(`[BACKGROUND PIPELINE] Bỏ qua Term: ${errTerm.message}`);
-            }
-
-            // 2. Cào Lịch thi
-            try {
-              const examResult = await fetchExamScheduleInternal(page, username, studentName, { fetchAll: true, preferredSemester: "all" });
-              setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "all" }), examResult);
-              setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "" }), examResult);
-              setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "all" }), examResult);
-              setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "" }), examResult);
-              console.log(`[BACKGROUND PIPELINE] ✓ Đã lưu Lịch thi cho ${username}`);
-            } catch (errExam) {
-              console.warn(`[BACKGROUND PIPELINE] Bỏ qua Exam: ${errExam.message}`);
-            }
-          } catch (e) {
-            console.warn(`[BACKGROUND PIPELINE] Lỗi pipeline: ${e.message}`);
-          } finally {
-            await cleanupPage(page, browserContext);
-          }
-        })();
-
-        return weeklyResult;
-      }
-
-      await cleanupPage(page, browserContext);
       return weeklyResult;
-    } catch (err) {
+    } finally {
       await cleanupPage(page, browserContext);
-      throw err;
     }
   });
 }
