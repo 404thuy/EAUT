@@ -84,6 +84,7 @@ app.post("/schedule", async (req, res) => {
       preferredWeek: req.body.week || null,
       strictWeek: false,
       useCache: false, // Force fresh crawl per account on login!
+      backgroundHydrate: true, // Tự động cào ngầm Term & Exam trên cùng phiên đăng nhập
     });
 
     req.session.studentLogin = {
@@ -258,6 +259,19 @@ app.get("/schedule/all", async (req, res) => {
       result: null,
       formData: { username: saved.username, password: saved.password },
     });
+  }
+});
+
+app.get("/api/schedule/prefetch-all", async (req, res) => {
+  const saved = req.session.studentLogin;
+  if (!saved?.username || !saved?.password) {
+    return res.status(401).json({ success: false, error: "Chưa đăng nhập" });
+  }
+  try {
+    const result = await prefetchAllStudentData(saved.username, saved.password);
+    return res.json({ success: true, message: "Đã tải ngầm và lưu trọn vẹn cả 3 lịch", result });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 

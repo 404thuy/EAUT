@@ -91,88 +91,113 @@ function setCache(key, data) {
 
 // ─── Puppeteer Singleton Browser Management ────────────────────────────
 let _browser = null;
+let _browserPromise = null;
+
 async function getBrowser() {
   if (_browser && _browser.connected) return _browser;
+  if (_browserPromise) return _browserPromise;
 
-  const execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  _browserPromise = (async () => {
+    const MAX_LAUNCH_RETRIES = 3;
+    for (let attempt = 1; attempt <= MAX_LAUNCH_RETRIES; attempt++) {
+      try {
+        const execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
 
-  if (execPath) {
-    // ── Docker / Railway / Render: dùng Chrome hệ thống ──────────────
-    console.log(`[BROWSER] Docker mode - Chrome: ${execPath}`);
-    const { default: puppeteerCore } = await import("puppeteer-core");
-    _browser = await puppeteerCore.launch({
-      headless: true,
-      executablePath: execPath,
-      ignoreHTTPSErrors: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-gpu",
-        "--disable-dev-shm-usage",
-        "--disable-web-security",
-        "--ignore-certificate-errors",
-      ],
-    });
-  } else if (isServerless) {
-    // ── Production (Vercel / AWS Lambda): dùng Chromium dành cho serverless ──
-    console.log("[BROWSER] Serverless mode - using @sparticuz/chromium");
+        if (execPath) {
+          // ── Docker / Railway / Render: dùng Chrome hệ thống ──────────────
+          console.log(`[BROWSER] Docker mode - Chrome: ${execPath}`);
+          const { default: puppeteerCore } = await import("puppeteer-core");
+          _browser = await puppeteerCore.launch({
+            headless: true,
+            executablePath: execPath,
+            ignoreHTTPSErrors: true,
+            args: [
+              "--no-sandbox",
+              "--disable-setuid-sandbox",
+              "--disable-gpu",
+              "--disable-dev-shm-usage",
+              "--disable-web-security",
+              "--ignore-certificate-errors",
+            ],
+          });
+        } else if (isServerless) {
+          // ── Production (Vercel / AWS Lambda): dùng Chromium dành cho serverless ──
+          console.log("[BROWSER] Serverless mode - using @sparticuz/chromium");
 
-    const { default: chromium } = await import("@sparticuz/chromium");
-    const { default: puppeteerCore } = await import("puppeteer-core");
+          const { default: chromium } = await import("@sparticuz/chromium");
+          const { default: puppeteerCore } = await import("puppeteer-core");
 
-    // Tắt đồ họa WebGL để tiết kiệm RAM và giảm thời gian giải nén
-    chromium.setGraphicsMode = false;
+          chromium.setGraphicsMode = false;
 
-    const CHROMIUM_PACK_URL =
-      process.env.CHROMIUM_PACK_URL ||
-      "https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.tar";
+          const CHROMIUM_PACK_URL =
+            process.env.CHROMIUM_PACK_URL ||
+            "https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.tar";
 
-    let executablePath;
-    const defaultBin = path.join(process.cwd(), "node_modules", "@sparticuz", "chromium", "bin");
+          let executablePath;
+          const defaultBin = path.join(process.cwd(), "node_modules", "@sparticuz", "chromium", "bin");
 
-    if (fs.existsSync(defaultBin)) {
-      executablePath = await chromium.executablePath();
-    } else {
-      console.log("[BROWSER] Local Chromium binary not packaged, fetching remote pack...");
-      executablePath = await chromium.executablePath(CHROMIUM_PACK_URL);
+          if (fs.existsSync(defaultBin)) {
+            executablePath = await chromium.executablePath();
+          } else {
+            console.log("[BROWSER] Local Chromium binary not packaged, fetching remote pack...");
+            executablePath = await chromium.executablePath(CHROMIUM_PACK_URL);
+          }
+
+          _browser = await puppeteerCore.launch({
+            args: [
+              ...chromium.args,
+              "--disable-dev-shm-usage",
+              "--disable-gpu",
+            ],
+            defaultViewport: chromium.defaultViewport || { width: 1280, height: 800 },
+            executablePath: executablePath,
+            headless: "shell",
+            ignoreHTTPSErrors: true,
+          });
+        } else {
+          // ── Local dev: dùng puppeteer bình thường ─────────────────────────
+          console.log("[BROWSER] Local dev mode - bundled Chrome");
+          const { default: puppeteer } = await import("puppeteer");
+          _browser = await puppeteer.launch({
+            headless: "new",
+            ignoreHTTPSErrors: true,
+            args: [
+              "--no-sandbox",
+              "--disable-setuid-sandbox",
+              "--disable-web-security",
+              "--ignore-certificate-errors",
+              "--ignore-certificate-errors-spki-list",
+              "--disable-gpu",
+              "--disable-dev-shm-usage",
+              "--no-first-run",
+              "--no-zygote",
+              "--disable-extensions",
+            ],
+          });
+        }
+
+        _browser.on("disconnected", () => {
+          console.log("[BROWSER] Chromium disconnected, resetting singleton.");
+          _browser = null;
+        });
+
+        return _browser;
+      } catch (err) {
+        console.error(`[BROWSER LAUNCH ERROR] Attempt ${attempt} failed: ${err.message}`);
+        _browser = null;
+        if (err.message.includes("ETXTBSY") || attempt < MAX_LAUNCH_RETRIES) {
+          console.log(`[BROWSER RETRY] Retrying launch in ${attempt * 800}ms...`);
+          await new Promise((r) => setTimeout(r, attempt * 800));
+        } else {
+          throw err;
+        }
+      }
     }
+  })().finally(() => {
+    _browserPromise = null;
+  });
 
-    _browser = await puppeteerCore.launch({
-      args: [
-        ...chromium.args,
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-      ],
-      defaultViewport: chromium.defaultViewport || { width: 1280, height: 800 },
-      executablePath: executablePath,
-      headless: "shell",
-      ignoreHTTPSErrors: true,
-    });
-
-    _browser.on("disconnected", () => {
-      console.log("[BROWSER] Chromium disconnected, resetting singleton.");
-      _browser = null;
-    });
-  } else {
-    // ── Local dev: dùng puppeteer bình thường ─────────────────────────
-    console.log("[BROWSER] Local dev mode - bundled Chrome");
-    const { default: puppeteer } = await import("puppeteer");
-    _browser = await puppeteer.launch({
-      headless: "new",
-      ignoreHTTPSErrors: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-web-security",
-        "--ignore-certificate-errors",
-        "--ignore-certificate-errors-spki-list",
-        "--disable-gpu",
-        "--disable-dev-shm-usage",
-      ],
-    });
-  }
-
-  return _browser;
+  return _browserPromise;
 }
 
 
@@ -1559,9 +1584,50 @@ async function getStudentSchedule(username, password, options = {}) {
       if (!preferredWeek && !preferredSemester) {
         setCache(keyAlt, weeklyResult);
       }
-      return weeklyResult;
-    } finally {
+
+      if (options.backgroundHydrate !== false) {
+        // Tận dụng chính phiên page này để cào ngầm luôn Term và Exam trong background
+        (async () => {
+          try {
+            console.log(`[BACKGROUND PIPELINE] Đang cào ngầm Term & Exam cho ${username}...`);
+            // 1. Cào Lịch học kỳ
+            try {
+              const termResult = await fetchTermScheduleInternal(page, username, studentName, { fetchAll: true });
+              setCache(cacheKey(username, "term", { fetchAll: false, preferredSemester: "" }), termResult);
+              setCache(cacheKey(username, "term", { fetchAll: true, preferredSemester: "" }), termResult);
+              setCache(cacheKey(username, "term", { fetchAll: false, preferredSemester: "all" }), termResult);
+              setCache(cacheKey(username, "term", { fetchAll: true, preferredSemester: "all" }), termResult);
+              console.log(`[BACKGROUND PIPELINE] ✓ Đã lưu Lịch học kỳ cho ${username}`);
+            } catch (errTerm) {
+              console.warn(`[BACKGROUND PIPELINE] Bỏ qua Term: ${errTerm.message}`);
+            }
+
+            // 2. Cào Lịch thi
+            try {
+              const examResult = await fetchExamScheduleInternal(page, username, studentName, { fetchAll: true, preferredSemester: "all" });
+              setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "all" }), examResult);
+              setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "" }), examResult);
+              setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "all" }), examResult);
+              setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "" }), examResult);
+              console.log(`[BACKGROUND PIPELINE] ✓ Đã lưu Lịch thi cho ${username}`);
+            } catch (errExam) {
+              console.warn(`[BACKGROUND PIPELINE] Bỏ qua Exam: ${errExam.message}`);
+            }
+          } catch (e) {
+            console.warn(`[BACKGROUND PIPELINE] Lỗi pipeline: ${e.message}`);
+          } finally {
+            await cleanupPage(page, browserContext);
+          }
+        })();
+
+        return weeklyResult;
+      }
+
       await cleanupPage(page, browserContext);
+      return weeklyResult;
+    } catch (err) {
+      await cleanupPage(page, browserContext);
+      throw err;
     }
   });
 }
