@@ -261,6 +261,31 @@ app.get("/schedule/all", async (req, res) => {
   }
 });
 
+app.get("/api/schedule/week", async (req, res) => {
+  const selectedWeek = req.query.week || "";
+  const selectedSemester = req.query.semester || "";
+  const saved = req.session.studentLogin;
+
+  if (!saved?.username || !saved?.password) {
+    return res.status(401).json({ success: false, error: "Chưa đăng nhập" });
+  }
+
+  try {
+    const result = await getStudentSchedule(saved.username, saved.password, {
+      preferredWeek: selectedWeek,
+      preferredSemester: selectedSemester,
+      strictWeek: true,
+      useCache: !req.query.refresh,
+    });
+    return res.json({
+      success: true,
+      result: { ...result, viewType: "week" },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.get("/api/schedule/term", async (req, res) => {
   const selectedSemester = req.query.semester || "";
   const saved = req.session.studentLogin;

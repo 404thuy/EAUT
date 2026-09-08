@@ -1108,7 +1108,7 @@
                                       <div class="session-item__sub" style="display: flex; flex-direction: column; gap: 3px; margin-top: auto; border-top: 1px solid var(--line); padding-top: 5px;">
                                         <div style="display: flex; align-items: center; gap: 5px; font-size: 0.72rem;">
                                           <span style="flex: 0 0 15px; font-size: 0.78rem;">📍</span>
-                                          <span style="flex: 1; color: var(--text-muted);">Phòng: <strong style="color: var(--text-main); font-weight: 850;"><%= item.room %></strong></span>
+                                          <strong style="flex: 1; color: var(--text-main); font-weight: 850;"><%= item.room %></strong>
                                         </div>
                                         <div style="display: flex; align-items: center; gap: 5px; font-size: 0.72rem;">
                                           <span style="flex: 0 0 15px; font-size: 0.78rem;">👤</span>
@@ -1875,7 +1875,7 @@
     <% if (result) { %>
     <div id="eautAppMeta" data-user="<%= (formData && formData.username) ? formData.username : '' %>" data-view-type="<%= (result && result.viewType) ? result.viewType : 'week' %>" style="display:none;" aria-hidden="true"></div>
     <% } %>
-    <script src="/app.js?v=2.2"></script>
+    <script src="/app.js?v=2.3"></script>
     <script>
       // Quick refresh logic
       const refreshBtn = document.getElementById('refreshBtn');

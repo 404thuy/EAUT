@@ -1544,8 +1544,9 @@ async function getStudentSchedule(username, password, options = {}) {
   const strictWeek = Boolean(options.strictWeek);
 
   const key = cacheKey(username, "weekly", { preferredWeek, preferredSemester, strictWeek });
+  const keyAlt = cacheKey(username, "weekly", { preferredWeek, preferredSemester, strictWeek: !strictWeek });
   if (options.useCache !== false) {
-    const cached = getFromCache(key);
+    const cached = getFromCache(key) || (!preferredWeek && !preferredSemester ? getFromCache(keyAlt) : null);
     if (cached) return cached;
   }
 
@@ -1555,6 +1556,9 @@ async function getStudentSchedule(username, password, options = {}) {
       ({ browserContext, page, studentName } = await createAuthenticatedPage(username, password));
       const weeklyResult = await fetchWeeklyScheduleInternal(page, username, studentName, options);
       setCache(key, weeklyResult);
+      if (!preferredWeek && !preferredSemester) {
+        setCache(keyAlt, weeklyResult);
+      }
       return weeklyResult;
     } finally {
       await cleanupPage(page, browserContext);
@@ -1569,9 +1573,16 @@ async function getStudentTermSchedule(username, password, options = {}) {
   const specificKey = cacheKey(username, "term", { fetchAll, preferredSemester });
   const generalKey = cacheKey(username, "term", { fetchAll: true, preferredSemester: "" });
   const allKey = cacheKey(username, "term", { fetchAll: true, preferredSemester: "all" });
+  const falseEmptyKey = cacheKey(username, "term", { fetchAll: false, preferredSemester: "" });
+  const falseAllKey = cacheKey(username, "term", { fetchAll: false, preferredSemester: "all" });
 
   if (options.useCache !== false) {
-    const cached = getFromCache(specificKey) || getFromCache(generalKey) || getFromCache(allKey);
+    const cached =
+      getFromCache(specificKey) ||
+      getFromCache(generalKey) ||
+      getFromCache(allKey) ||
+      getFromCache(falseEmptyKey) ||
+      getFromCache(falseAllKey);
     if (cached) {
       return filterResultsBySemester(cached, preferredSemester);
     }
@@ -1583,6 +1594,10 @@ async function getStudentTermSchedule(username, password, options = {}) {
       ({ browserContext, page, studentName } = await createAuthenticatedPage(username, password));
       const result = await fetchTermScheduleInternal(page, username, studentName, options);
       setCache(specificKey, result);
+      setCache(generalKey, result);
+      setCache(allKey, result);
+      setCache(falseEmptyKey, result);
+      setCache(falseAllKey, result);
       return filterResultsBySemester(result, preferredSemester);
     } finally {
       await cleanupPage(page, browserContext);
@@ -1596,9 +1611,17 @@ async function getStudentExamSchedule(username, password, options = {}) {
 
   const specificKey = cacheKey(username, "exam", { fetchAll: fetchAllExams, preferredSemester });
   const generalKey = cacheKey(username, "exam", { fetchAll: true, preferredSemester: "all" });
+  const emptyKey = cacheKey(username, "exam", { fetchAll: true, preferredSemester: "" });
+  const falseAllKey = cacheKey(username, "exam", { fetchAll: false, preferredSemester: "all" });
+  const falseEmptyKey = cacheKey(username, "exam", { fetchAll: false, preferredSemester: "" });
 
   if (options.useCache !== false) {
-    const cached = getFromCache(specificKey) || getFromCache(generalKey);
+    const cached =
+      getFromCache(specificKey) ||
+      getFromCache(generalKey) ||
+      getFromCache(emptyKey) ||
+      getFromCache(falseAllKey) ||
+      getFromCache(falseEmptyKey);
     if (cached) {
       return filterResultsBySemester(cached, preferredSemester);
     }
@@ -1610,6 +1633,10 @@ async function getStudentExamSchedule(username, password, options = {}) {
       ({ browserContext, page, studentName } = await createAuthenticatedPage(username, password));
       const result = await fetchExamScheduleInternal(page, username, studentName, options);
       setCache(specificKey, result);
+      setCache(generalKey, result);
+      setCache(emptyKey, result);
+      setCache(falseAllKey, result);
+      setCache(falseEmptyKey, result);
       return filterResultsBySemester(result, preferredSemester);
     } finally {
       await cleanupPage(page, browserContext);

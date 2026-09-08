@@ -418,43 +418,113 @@ if (pingBadge && pingText) {
   });
 }
 
-// --- Smart Background Hydration & Hardware Acceleration ---
+// --- Smart Background Hydration & Hardware Acceleration (Lưu tạm cả 3 chức năng trên thiết bị) ---
 (function initBackgroundHydration() {
   const metaEl = document.getElementById("eautAppMeta");
   const user = metaEl ? metaEl.getAttribute("data-user") : (window.__EAUT_USER__ || null);
-  const viewType = metaEl ? metaEl.getAttribute("data-view-type") : (window.__EAUT_VIEW_TYPE__ || "week");
+  const currentView = metaEl ? metaEl.getAttribute("data-view-type") : (window.__EAUT_VIEW_TYPE__ || "week");
   if (!user) return;
 
-  // When student is viewing weekly schedule, quietly prefetch Term and Exam into server & disk cache
-  if (viewType === "week" || !viewType) {
-    const triggerPrefetch = () => {
-      // 1. Prefetch Term schedule
-      fetch("/api/schedule/term", { headers: { "X-Requested-With": "XMLHttpRequest" } })
-        .then((res) => res.json())
-        .then((json) => {
-          if (json && json.success) {
-            console.log("[Prefetch] Term schedule ready in background cache.");
-          }
-        })
-        .catch(() => {});
+  const CACHE_PREFIX = "eaut_hw_cache_";
+  const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 giờ
 
-      // 2. Prefetch Exam schedule
-      setTimeout(() => {
-        fetch("/api/schedule/exam", { headers: { "X-Requested-With": "XMLHttpRequest" } })
-          .then((res) => res.json())
-          .then((json) => {
-            if (json && json.success) {
-              console.log("[Prefetch] Exam schedule ready in background cache.");
-            }
-          })
-          .catch(() => {});
-      }, 1500);
-    };
-
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(triggerPrefetch, { timeout: 3000 });
-    } else {
-      setTimeout(triggerPrefetch, 1000);
+  // 1. Tiện ích lưu trữ phần cứng thiết bị (localStorage của máy)
+  const saveToHardware = (key, data) => {
+    try {
+      localStorage.setItem(CACHE_PREFIX + key + "_" + user, JSON.stringify({
+        timestamp: Date.now(),
+        data: data,
+      }));
+    } catch (e) {
+      // Bỏ qua nếu bộ nhớ đầy hoặc chế độ ẩn danh hạn chế
     }
+  };
+
+  const getFromHardware = (key) => {
+    try {
+      const raw = localStorage.getItem(CACHE_PREFIX + key + "_" + user);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (Date.now() - parsed.timestamp <= CACHE_TTL) {
+        return parsed.data;
+      }
+      localStorage.removeItem(CACHE_PREFIX + key + "_" + user);
+    } catch (e) {}
+    return null;
+  };
+
+  // 2. Prefetch trước tài nguyên trang HTML vào cache phần cứng của trình duyệt
+  const prefetchPageHTML = (url) => {
+    try {
+      const link = document.createElement("link");
+      link.rel = "prefetch";
+      link.href = url;
+      link.as = "document";
+      document.head.appendChild(link);
+    } catch (e) {}
+    fetch(url, { credentials: "same-origin" }).catch(() => {});
+  };
+
+  // 3. Danh sách đầy đủ cả 3 chức năng chính
+  const allFunctions = [
+    { type: "week", api: "/api/schedule/week", url: "/schedule/week", label: "Lịch học tuần" },
+    { type: "term", api: "/api/schedule/term", url: "/schedule/term", label: "Lịch học kỳ" },
+    { type: "exam", api: "/api/schedule/exam", url: "/schedule/exam", label: "Lịch thi" },
+  ];
+
+  // Lưu trạng thái chức năng hiện tại vào bộ nhớ phần cứng
+  saveToHardware(currentView, { active: true, loadedAt: Date.now() });
+
+  // 4. Xác định các chức năng còn lại cần tải ngầm (đủ cả 3 chức năng)
+  const pendingPrefetches = allFunctions.filter((fn) => fn.type !== currentView);
+
+  // 5. Trình tải ngầm tuần tự (chạy lần lượt để bảo đảm không bị nghẽn mạng hay trùng lặp session)
+  const runSequentialHydration = async () => {
+    for (const fn of pendingPrefetches) {
+      try {
+        console.log(`[Hardware Storage] Bắt đầu tải ngầm: ${fn.label}...`);
+        const res = await fetch(fn.api, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        const json = await res.json();
+        if (json && json.success) {
+          // Lưu dữ liệu vào bộ nhớ phần cứng (localStorage)
+          saveToHardware(fn.type, json.result);
+          // Nạp trước trang HTML vào cache trình duyệt để bấm là mở ngay
+          prefetchPageHTML(fn.url);
+          console.log(`[Hardware Storage] ✓ Đã lưu ${fn.label} vào bộ nhớ thiết bị thành công!`);
+        }
+      } catch (err) {
+        console.warn(`[Hardware Storage] Tải ngầm ${fn.label} tạm hoãn:`, err);
+      }
+      // Nghỉ 800ms giữa các lần tải để nhường CPU & phần cứng thiết bị cho tác vụ người dùng
+      await new Promise((resolve) => setTimeout(resolve, 800));
+    }
+    console.log("[Hardware Storage] ✓ Hoàn tất: Cả 3 chức năng (Tuần, Kỳ, Thi) đã được lưu trên thiết bị!");
+  };
+
+  // 6. Kích hoạt khi thiết bị ở trạng thái rảnh rỗi (idle)
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(runSequentialHydration, { timeout: 2500 });
+  } else {
+    setTimeout(runSequentialHydration, 800);
   }
+
+  // 7. Tăng tốc tức thì khi người dùng rê chuột / chạm nhẹ vào menu
+  document.querySelectorAll("[data-nav-item]").forEach((item) => {
+    const handlePreload = () => {
+      const navType = item.getAttribute("data-nav-item");
+      let targetUrl = null;
+      if (navType === "weekly") targetUrl = "/schedule/week";
+      else if (navType === "term") targetUrl = "/schedule/term";
+      else if (navType === "exams") targetUrl = "/schedule/exam";
+
+      if (targetUrl && !item._hasPrefetched) {
+        item._hasPrefetched = true;
+        prefetchPageHTML(targetUrl);
+      }
+    };
+    item.addEventListener("mouseenter", handlePreload, { passive: true });
+    item.addEventListener("touchstart", handlePreload, { passive: true });
+  });
 })();
