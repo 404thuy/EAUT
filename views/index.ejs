@@ -1878,12 +1878,15 @@
     <% if (result) { %>
     <div id="eautAppMeta" data-user="<%= (formData && formData.username) ? formData.username : '' %>" data-view-type="<%= (result && result.viewType) ? result.viewType : 'week' %>" style="display:none;" aria-hidden="true"></div>
     <% } %>
-    <script src="/app.js?v=2.5"></script>
+    <script src="/app.js?v=3.0"></script>
     <script>
       // Quick refresh logic
       const refreshBtn = document.getElementById('refreshBtn');
       if (refreshBtn) {
         refreshBtn.addEventListener('click', () => {
+          try {
+            sessionStorage.clear();
+          } catch (e) {}
           if (typeof window.startLiveLatencyTracker === 'function') {
             window.startLiveLatencyTracker();
           } else {

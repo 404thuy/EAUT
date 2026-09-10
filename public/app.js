@@ -125,91 +125,111 @@ themeToggles.forEach(btn => {
   });
 });
 
-const viewButtons = $$("[data-view-mode]");
-const viewBlocks = $$("[data-view-block]");
+// --- Reusable Interactive Handlers (kích hoạt cho cả trang gốc và sau khi đổi tab tức thì) ---
+function rebindInteractiveHandlers() {
+  const root = document.getElementById("workspace") || document;
 
-if (viewButtons.length && viewBlocks.length) {
-  const setViewMode = (mode) => {
-    viewBlocks.forEach((block) => {
-      block.classList.toggle("is-hidden", block.dataset.viewBlock !== mode);
-    });
+  // 1. Chuyển đổi giao diện Dạng bảng / Dạng danh sách
+  const viewButtons = $$("[data-view-mode]", root);
+  const viewBlocks = $$("[data-view-block]", root);
+
+  if (viewButtons.length && viewBlocks.length) {
+    const setViewMode = (mode) => {
+      viewBlocks.forEach((block) => {
+        block.classList.toggle("is-hidden", block.dataset.viewBlock !== mode);
+      });
+      viewButtons.forEach((button) => {
+        button.classList.toggle("is-active", button.dataset.viewMode === mode);
+      });
+    };
+
+    // Detect mobile and set default view to list if not explicitly selected
+    const isMobile = window.innerWidth < 768;
+    const currentActive = viewButtons.find((b) => b.classList.contains("is-active"));
+    setViewMode(currentActive ? currentActive.dataset.viewMode : (isMobile ? "list" : "table"));
+
     viewButtons.forEach((button) => {
-      button.classList.toggle("is-active", button.dataset.viewMode === mode);
+      button.onclick = () => setViewMode(button.dataset.viewMode);
     });
-  };
+  }
 
-  // Detect mobile and set default view to list
-  const isMobile = window.innerWidth < 768;
-  setViewMode(isMobile ? "list" : "table");
+  // 2. Bộ lọc tìm kiếm môn học / giảng viên / phòng
+  const filterInput = $("#subjectFilter", root);
+  const sessionItems = $$(".session-item, .list-item", root);
+  if (filterInput && sessionItems.length) {
+    filterInput.oninput = (event) => {
+      const keyword = String(event.target.value || "").toLowerCase().trim();
+      sessionItems.forEach((item) => {
+        const source = item.dataset.searchContent || "";
+        const isMatch = !keyword || source.includes(keyword);
+        item.classList.toggle("is-hidden", !isMatch);
+      });
+    };
+  }
 
-  viewButtons.forEach((button) => {
-    button.addEventListener("click", () => setViewMode(button.dataset.viewMode));
-  });
-}
+  // 3. Bộ lọc lịch thi
+  const examFilterInput = $("#examFilter", root);
+  const examItems = $$(".exam-item", root);
+  if (examFilterInput && examItems.length) {
+    examFilterInput.oninput = (event) => {
+      const keyword = String(event.target.value || "").toLowerCase().trim();
+      examItems.forEach((item) => {
+        const source = item.dataset.searchContent || "";
+        const isMatch = !keyword || source.includes(keyword);
+        item.classList.toggle("is-hidden", !isMatch);
+      });
+    };
+  }
 
-const filterInput = $("#subjectFilter");
-const sessionItems = $$(".session-item, .list-item");
-const dayGroups = $$(".list-day-group");
+  // 4. Lọc theo thứ trong tuần
+  const dayFilterButtons = $$("[data-day-filter]", root);
+  const dayGroups = $$(".list-day-group", root);
+  if (dayFilterButtons.length) {
+    const setDayFilter = (value) => {
+      dayFilterButtons.forEach((button) => {
+        button.classList.toggle("is-active", button.getAttribute("data-day-filter") === value);
+      });
+      dayGroups.forEach((group) => {
+        const current = group.getAttribute("data-day-group");
+        group.classList.toggle("is-hidden", value !== "all" && current !== value);
+      });
+    };
 
-// Sidebar active item by user selection
-const navItems = $$("[data-nav-item]");
-const setActiveNav = (id) => {
-  navItems.forEach((item) => item.classList.toggle("is-active", item.getAttribute("data-nav-item") === id));
-};
-navItems.forEach((item) => {
-  item.addEventListener("click", () => {
-    const id = item.getAttribute("data-nav-item");
-    if (id) setActiveNav(id);
-  });
-});
+    const activeFilterBtn = dayFilterButtons.find((b) => b.classList.contains("is-active"));
+    setDayFilter(activeFilterBtn ? (activeFilterBtn.getAttribute("data-day-filter") || "all") : "all");
 
-if (filterInput && sessionItems.length) {
-  filterInput.addEventListener("input", (event) => {
-    const keyword = String(event.target.value || "").toLowerCase().trim();
-    sessionItems.forEach((item) => {
-      const source = item.dataset.searchContent || "";
-      const isMatch = !keyword || source.includes(keyword);
-      item.classList.toggle("is-hidden", !isMatch);
-    });
-  });
-}
-
-const examFilterInput = $("#examFilter");
-const examItems = $$(".exam-item");
-if (examFilterInput && examItems.length) {
-  examFilterInput.addEventListener("input", (event) => {
-    const keyword = String(event.target.value || "").toLowerCase().trim();
-    examItems.forEach((item) => {
-      const source = item.dataset.searchContent || "";
-      const isMatch = !keyword || source.includes(keyword);
-      item.classList.toggle("is-hidden", !isMatch);
-    });
-  });
-}
-
-const dayFilterButtons = $$("[data-day-filter]");
-if (dayFilterButtons.length) {
-  const tableHeaders = $$(".week-grid__day");
-  const tableCells = $$(".week-grid__cell");
-
-  const setDayFilter = (value) => {
-    // 1. Update buttons
     dayFilterButtons.forEach((button) => {
-      button.classList.toggle("is-active", button.getAttribute("data-day-filter") === value);
+      button.onclick = () => setDayFilter(button.getAttribute("data-day-filter") || "all");
     });
+  }
 
-    // 2. Filter list view groups
-    dayGroups.forEach((group) => {
-      const current = group.getAttribute("data-day-group");
-      group.classList.toggle("is-hidden", value !== "all" && current !== value);
-    });
-  };
-
-  setDayFilter("all");
-  dayFilterButtons.forEach((button) => {
-    button.addEventListener("click", () => setDayFilter(button.getAttribute("data-day-filter") || "all"));
+  // 5. Chuyển tuần và học kỳ mượt mà qua Instant Navigator (nếu có)
+  $$("form.week-form", root).forEach((form) => {
+    const select = form.querySelector("select");
+    if (select) {
+      select.onchange = (e) => {
+        e.preventDefault();
+        const action = form.getAttribute("action") || window.location.pathname;
+        const name = select.getAttribute("name") || "semester";
+        const val = select.value;
+        const targetUrl = action + (action.includes("?") ? "&" : "?") + encodeURIComponent(name) + "=" + encodeURIComponent(val);
+        if (window.InstantTabNavigator && window.InstantTabNavigator.navigateTo) {
+          window.InstantTabNavigator.navigateTo(targetUrl);
+        } else {
+          form.submit();
+        }
+      };
+    }
   });
+
+  // 6. Cập nhật đồng hồ đếm ngược nếu có
+  if (typeof window.updateCountdowns === "function") {
+    window.updateCountdowns();
+  }
 }
+
+// Chạy khởi tạo tương tác lần đầu
+rebindInteractiveHandlers();
 
 // Toggle Password Visibility
 const togglePasswordBtn = $("#togglePasswordBtn");
@@ -360,12 +380,12 @@ if (pingBadge && pingText) {
     }, 50);
   };
 
-  // Attach tracker to all navigation links
+  // Attach tracker to all navigation links (ngoại trừ các tab chuyển tức thì)
   document.querySelectorAll("a[href]").forEach((link) => {
     const href = link.getAttribute("href");
     if (href && !href.startsWith("#") && !href.startsWith("javascript:") && !link.target) {
       link.addEventListener("click", () => {
-        if (!link.hasAttribute("download")) {
+        if (!link.hasAttribute("download") && !link.closest(".sidebar-nav a[data-nav-item]")) {
           window.startLiveLatencyTracker();
         }
       });
@@ -418,113 +438,312 @@ if (pingBadge && pingText) {
   });
 }
 
-// --- Smart Background Hydration & Hardware Acceleration (Lưu tạm cả 3 chức năng trên thiết bị) ---
-(function initBackgroundHydration() {
+// --- InstantTabNavigator: Chuyển tab lịch học tức thì (0ms) với bộ nhớ đệm thiết bị ---
+window.InstantTabNavigator = (() => {
+  const memoryCache = new Map();
+  const STORAGE_PREFIX = "eaut_view_html_";
+  let isNavigating = false;
+
   const metaEl = document.getElementById("eautAppMeta");
-  const user = metaEl ? metaEl.getAttribute("data-user") : (window.__EAUT_USER__ || null);
-  const currentView = metaEl ? metaEl.getAttribute("data-view-type") : (window.__EAUT_VIEW_TYPE__ || "week");
-  if (!user) return;
+  const user = metaEl ? metaEl.getAttribute("data-user") : (window.__EAUT_USER__ || "");
 
-  const CACHE_PREFIX = "eaut_hw_cache_";
-  const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 giờ
-
-  // 1. Tiện ích lưu trữ phần cứng thiết bị (localStorage của máy)
-  const saveToHardware = (key, data) => {
+  const normalizeUrl = (url) => {
     try {
-      localStorage.setItem(CACHE_PREFIX + key + "_" + user, JSON.stringify({
-        timestamp: Date.now(),
-        data: data,
-      }));
-    } catch (e) {
-      // Bỏ qua nếu bộ nhớ đầy hoặc chế độ ẩn danh hạn chế
+      const u = new URL(url, window.location.origin);
+      return u.pathname + u.search;
+    } catch {
+      return url;
     }
   };
 
-  const getFromHardware = (key) => {
+  const getStorageKey = (url) => {
+    return STORAGE_PREFIX + (user || "anon") + "_" + normalizeUrl(url);
+  };
+
+  const saveCache = (url, data) => {
+    const norm = normalizeUrl(url);
+    memoryCache.set(norm, {
+      ...data,
+      timestamp: Date.now()
+    });
     try {
-      const raw = localStorage.getItem(CACHE_PREFIX + key + "_" + user);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (Date.now() - parsed.timestamp <= CACHE_TTL) {
-        return parsed.data;
+      sessionStorage.setItem(getStorageKey(norm), JSON.stringify({
+        title: data.title,
+        html: data.html,
+        timestamp: Date.now()
+      }));
+    } catch (e) {}
+  };
+
+  const getCache = (url) => {
+    const norm = normalizeUrl(url);
+    if (memoryCache.has(norm)) {
+      return memoryCache.get(norm);
+    }
+    try {
+      const raw = sessionStorage.getItem(getStorageKey(norm));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Date.now() - parsed.timestamp < 2 * 60 * 60 * 1000) {
+          memoryCache.set(norm, parsed);
+          return parsed;
+        }
       }
-      localStorage.removeItem(CACHE_PREFIX + key + "_" + user);
     } catch (e) {}
     return null;
   };
 
-  // 2. Prefetch trước tài nguyên trang HTML vào cache phần cứng của trình duyệt
-  const prefetchPageHTML = (url) => {
-    try {
-      const link = document.createElement("link");
-      link.rel = "prefetch";
-      link.href = url;
-      link.as = "document";
-      document.head.appendChild(link);
-    } catch (e) {}
-    fetch(url, { credentials: "same-origin" }).catch(() => {});
+  const updateActiveNav = (targetUrl) => {
+    const norm = normalizeUrl(targetUrl);
+    let navType = "weekly";
+    if (norm.startsWith("/schedule/term")) navType = "term";
+    else if (norm.startsWith("/schedule/exam")) navType = "exams";
+
+    document.querySelectorAll("[data-nav-item]").forEach((item) => {
+      const id = item.getAttribute("data-nav-item");
+      item.classList.toggle("is-active", id === navType);
+    });
   };
 
-  // 3. Danh sách đầy đủ cả 3 chức năng chính
-  const allFunctions = [
-    { type: "week", api: "/api/schedule/week", url: "/schedule/week", label: "Lịch học tuần" },
-    { type: "term", api: "/api/schedule/term", url: "/schedule/term", label: "Lịch học kỳ" },
-    { type: "exam", api: "/api/schedule/exam", url: "/schedule/exam", label: "Lịch thi" },
-  ];
-
-  // Lưu trạng thái chức năng hiện tại vào bộ nhớ phần cứng
-  saveToHardware(currentView, { active: true, loadedAt: Date.now() });
-
-  // 4. Xác định các chức năng còn lại cần tải ngầm (đủ cả 3 chức năng)
-  const pendingPrefetches = allFunctions.filter((fn) => fn.type !== currentView);
-
-  // 5. Trình tải ngầm tuần tự (chạy lần lượt để bảo đảm không bị nghẽn mạng hay trùng lặp session)
-  const runSequentialHydration = async () => {
-    for (const fn of pendingPrefetches) {
-      try {
-        console.log(`[Hardware Storage] Bắt đầu tải ngầm: ${fn.label}...`);
-        const res = await fetch(fn.api, {
-          headers: { "X-Requested-With": "XMLHttpRequest" },
-        });
-        const json = await res.json();
-        if (json && json.success) {
-          // Lưu dữ liệu vào bộ nhớ phần cứng (localStorage)
-          saveToHardware(fn.type, json.result);
-          // Nạp trước trang HTML vào cache trình duyệt để bấm là mở ngay
-          prefetchPageHTML(fn.url);
-          console.log(`[Hardware Storage] ✓ Đã lưu ${fn.label} vào bộ nhớ thiết bị thành công!`);
-        }
-      } catch (err) {
-        console.warn(`[Hardware Storage] Tải ngầm ${fn.label} tạm hoãn:`, err);
-      }
-      // Nghỉ 800ms giữa các lần tải để nhường CPU & phần cứng thiết bị cho tác vụ người dùng
-      await new Promise((resolve) => setTimeout(resolve, 800));
+  let progressBar = null;
+  const showProgressBar = () => {
+    if (!progressBar) {
+      progressBar = document.createElement("div");
+      progressBar.className = "top-progress-bar";
+      progressBar.style.cssText = "position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--primary,#4f46e5),#38bdf8);z-index:99999;transition:width 0.2s ease;width:0%;box-shadow:0 0 8px rgba(56,189,248,0.6);";
+      document.body.appendChild(progressBar);
     }
-    console.log("[Hardware Storage] ✓ Hoàn tất: Cả 3 chức năng (Tuần, Kỳ, Thi) đã được lưu trên thiết bị!");
+    progressBar.style.display = "block";
+    progressBar.style.width = "35%";
   };
 
-  // 6. Kích hoạt khi thiết bị ở trạng thái rảnh rỗi (idle)
-  if ("requestIdleCallback" in window) {
-    window.requestIdleCallback(runSequentialHydration, { timeout: 2500 });
-  } else {
-    setTimeout(runSequentialHydration, 800);
-  }
+  const finishProgressBar = () => {
+    if (progressBar) {
+      progressBar.style.width = "100%";
+      setTimeout(() => {
+        if (progressBar) {
+          progressBar.style.display = "none";
+          progressBar.style.width = "0%";
+        }
+      }, 200);
+    }
+  };
 
-  // 7. Tăng tốc tức thì khi người dùng rê chuột / chạm nhẹ vào menu
-  document.querySelectorAll("[data-nav-item]").forEach((item) => {
-    const handlePreload = () => {
-      const navType = item.getAttribute("data-nav-item");
-      let targetUrl = null;
-      if (navType === "weekly") targetUrl = "/schedule/week";
-      else if (navType === "term") targetUrl = "/schedule/term";
-      else if (navType === "exams") targetUrl = "/schedule/exam";
+  const applyWorkspaceHTML = (html, targetUrl, title, isPopState = false) => {
+    const workspace = document.getElementById("workspace");
+    if (!workspace) return false;
 
-      if (targetUrl && !item._hasPrefetched) {
-        item._hasPrefetched = true;
-        prefetchPageHTML(targetUrl);
+    // 1. Hoán đổi DOM tức thì
+    workspace.innerHTML = html;
+
+    // 2. Đồng bộ menu sidebar và tiêu đề trang
+    updateActiveNav(targetUrl);
+    if (title) document.title = title;
+
+    // 3. Cập nhật URL trình duyệt nếu không phải từ nút Back/Forward
+    if (!isPopState) {
+      window.history.pushState({ instant: true, url: targetUrl }, "", targetUrl);
+    }
+
+    // 4. Cuộn lên đầu giao diện mượt mà
+    window.scrollTo({ top: 0, behavior: "instant" });
+
+    // 5. Đóng sidebar trên thiết bị di động
+    if (typeof setSidebarOpen === "function") {
+      setSidebarOpen(false);
+    }
+
+    // 6. Phát cảm ứng chạm xúc giác
+    if (typeof window.playTactileTap === "function") {
+      window.playTactileTap();
+    }
+
+    // 7. Kích hoạt lại các bộ lọc, chế độ xem, select của view mới
+    if (typeof rebindInteractiveHandlers === "function") {
+      rebindInteractiveHandlers();
+    }
+
+    // 8. Cập nhật Ping hiển thị phản hồi tức thì (< 1ms từ phần cứng máy)
+    const pingText = document.getElementById("pingText");
+    const pingBadge = document.getElementById("pingBadge");
+    if (pingText && pingBadge) {
+      pingBadge.classList.remove("is-poor", "is-medium", "is-measuring");
+      pingBadge.classList.add("is-good");
+      pingText.textContent = "1 ms";
+      pingBadge.title = "Dữ liệu tức thì từ bộ nhớ đệm thiết bị (0ms latency)";
+    }
+
+    return true;
+  };
+
+  const navigateTo = async (targetUrl, isPopState = false) => {
+    const norm = normalizeUrl(targetUrl);
+
+    // Nếu đang ở đúng URL này và không phải popstate, cuộn mượt lên đầu
+    if (!isPopState && norm === normalizeUrl(window.location.pathname + window.location.search)) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    // Nếu là yêu cầu làm mới dữ liệu từ server
+    if (norm.includes("refresh=1") || norm.includes("refresh=true")) {
+      window.location.href = targetUrl;
+      return;
+    }
+
+    // 1. Kiểm tra bộ nhớ đệm tức thì
+    const cached = getCache(norm);
+    if (cached && cached.html) {
+      applyWorkspaceHTML(cached.html, norm, cached.title, isPopState);
+      return;
+    }
+
+    // 2. Cache miss: Tải về từ server
+    if (isNavigating) return;
+    isNavigating = true;
+    showProgressBar();
+
+    try {
+      const startTime = performance.now();
+      const res = await fetch(targetUrl, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin"
+      });
+
+      if (!res.ok) throw new Error("HTTP error " + res.status);
+
+      const text = await res.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, "text/html");
+
+      const newWorkspace = doc.getElementById("workspace");
+      if (newWorkspace) {
+        const pageTitle = doc.title || document.title;
+        const pageHtml = newWorkspace.innerHTML;
+
+        saveCache(norm, {
+          title: pageTitle,
+          html: pageHtml
+        });
+
+        applyWorkspaceHTML(pageHtml, norm, pageTitle, isPopState);
+
+        const fetchTime = Math.round(performance.now() - startTime);
+        const pingText = document.getElementById("pingText");
+        if (pingText) pingText.textContent = `${fetchTime} ms`;
+      } else {
+        window.location.href = targetUrl;
       }
-    };
-    item.addEventListener("mouseenter", handlePreload, { passive: true });
-    item.addEventListener("touchstart", handlePreload, { passive: true });
-  });
+    } catch (err) {
+      console.error("[InstantNav] Fallback chuyển trang thường:", err);
+      window.location.href = targetUrl;
+    } finally {
+      isNavigating = false;
+      finishProgressBar();
+    }
+  };
+
+  const prefetchTabs = async () => {
+    const tabsToPrefetch = ["/schedule/week", "/schedule/term", "/schedule/exam"];
+    const currentNorm = normalizeUrl(window.location.pathname);
+
+    for (const url of tabsToPrefetch) {
+      if (normalizeUrl(url) !== currentNorm && !getCache(url)) {
+        try {
+          const res = await fetch(url, {
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            credentials: "same-origin"
+          });
+          if (res.ok) {
+            const text = await res.text();
+            const doc = new DOMParser().parseFromString(text, "text/html");
+            const newWorkspace = doc.getElementById("workspace");
+            if (newWorkspace) {
+              saveCache(url, {
+                title: doc.title || document.title,
+                html: newWorkspace.innerHTML
+              });
+            }
+          }
+        } catch (e) {}
+        await new Promise((r) => setTimeout(r, 600));
+      }
+    }
+  };
+
+  const init = () => {
+    const currentWorkspace = document.getElementById("workspace");
+    if (!currentWorkspace) return;
+
+    // 1. Lưu ngay chế độ xem ban đầu vào cache
+    const currentUrl = normalizeUrl(window.location.pathname + window.location.search);
+    saveCache(currentUrl, {
+      title: document.title,
+      html: currentWorkspace.innerHTML
+    });
+
+    // 2. Chặn các liên kết menu điều hướng chính để chuyển tab tức thì
+    document.querySelectorAll(".sidebar-nav a[data-nav-item]").forEach((link) => {
+      const navItem = link.getAttribute("data-nav-item");
+      if (["weekly", "term", "exams"].includes(navItem)) {
+        link.addEventListener("click", (e) => {
+          if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return;
+          e.preventDefault();
+          const targetUrl = link.getAttribute("href");
+          if (targetUrl) {
+            navigateTo(targetUrl);
+          }
+        });
+
+        // Nạp trước khi rê chuột hoặc chạm nhẹ
+        const handlePreload = () => {
+          const targetUrl = link.getAttribute("href");
+          if (targetUrl && !getCache(targetUrl) && !link._hasPrefetched) {
+            link._hasPrefetched = true;
+            fetch(targetUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+              .then((res) => res.text())
+              .then((text) => {
+                const doc = new DOMParser().parseFromString(text, "text/html");
+                const ws = doc.getElementById("workspace");
+                if (ws) {
+                  saveCache(targetUrl, { title: doc.title || document.title, html: ws.innerHTML });
+                }
+              })
+              .catch(() => {});
+          }
+        };
+        link.addEventListener("mouseenter", handlePreload, { passive: true });
+        link.addEventListener("touchstart", handlePreload, { passive: true });
+      }
+    });
+
+    // 3. Hỗ trợ nút Back / Forward của trình duyệt
+    window.addEventListener("popstate", () => {
+      const targetUrl = normalizeUrl(window.location.pathname + window.location.search);
+      if (targetUrl.includes("/schedule/")) {
+        navigateTo(targetUrl, true);
+      }
+    });
+
+    // 4. Nạp ngầm các tab còn lại khi máy rảnh
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(prefetchTabs, { timeout: 2000 });
+    } else {
+      setTimeout(prefetchTabs, 800);
+    }
+  };
+
+  return {
+    init,
+    navigateTo,
+    saveCache,
+    getCache
+  };
 })();
+
+// Khởi chạy bộ chuyển tab tức thì
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => window.InstantTabNavigator.init());
+} else {
+  window.InstantTabNavigator.init();
+}
