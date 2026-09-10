@@ -37,7 +37,7 @@
     const text = norm(value);
     return (
       !text ||
-      ["sang", "chieu", "toi", "ca", "-", "dang cap nhat", "đang cập nhật"].includes(text) ||
+      ["sang", "chieu", "toi", "ca", "-", "dang cap nhat", "đang cập nhật", "chu nhat", "chủ nhật"].includes(text) ||
       /^thu\s+\d$/.test(text) ||
       /^thứ\s+\d$/.test(text)
     );
@@ -839,6 +839,8 @@
                 const idxMode = findHeaderIndex(["hinh thuc", "cach hoc"]);
 
                 const getDayIndex = (dayText, dateText) => {
+                  const normDay = norm(dayText);
+                  if (normDay.includes("chu nhat") || normDay === "cn" || normDay.includes("sunday")) return 8;
                   const d = toInt(dayText);
                   if (d >= 2 && d <= 8) return d;
                   const parsed = parseDate(dateText);
@@ -869,6 +871,7 @@
                   const teacherMatch = text.match(/(?:GV|Gi[aả]ng\s*vi[eê]n|Giang\s*vien)[:\s]+(.+?)(?=\s*(?:Ph[oò]ng|H[iì]nh\s*th[ứu]c|M[aã]\s*l[oớ]p|Ti[eê]t|$))/i);
                   const roomMatch = text.match(/(?:Phong|Phòng)[:\s]+([^\n]+?)(?=\s*(?:GV|Giảng|Hình|Hinh|Mã|Ma|Tiết|Tiet|$))/i);
                   const dayMatch = text.match(/(?:Thu|Thứ)[:\s]*([2-8])/i);
+                  const isSunday = /(?:Chủ\s*nhật|Chu\s*nhat|\bCN\b)/i.test(text);
                   const periodMatch = text.match(/Tiết(?:\s*học)?[:\s]*(\d+)\s*[-–—]\s*(\d+)/i);
                   const periodSingle = text.match(/Tiết(?:\s*học)?[:\s]*(\d{1,2})/i);
                   const coursePart = text.split(/(?:Ti[eê]t|M[aã]\s*l[oớ]p|GV|Gi[aả]ng|Ph[oò]ng|H[iì]nh)/i)[0].replace(/^L[oớ]p\s*h[oọ]c[:\-]?\s*/i, "").trim();
@@ -878,7 +881,7 @@
                     room: roomMatch ? roomMatch[1].trim() : "",
                     teacher: teacherMatch ? teacherMatch[1].trim() : "",
                     mode: modeMatch ? modeMatch[1].trim() : "",
-                    dayIndex: dayMatch ? Number(dayMatch[1]) : null,
+                    dayIndex: isSunday ? 8 : (dayMatch ? Number(dayMatch[1]) : null),
                     periodStart: periodMatch ? periodMatch[1] : periodSingle ? periodSingle[1] : "",
                     periodCount: periodMatch ? String(Number(periodMatch[2]) - Number(periodMatch[1]) + 1) : "",
                   };
@@ -958,7 +961,7 @@
                   return toInt(a.periodStart) - toInt(b.periodStart);
                 });
 
-                weekDays = [2, 3, 4, 5, 6, 7].map((dayIndex) => {
+                weekDays = [2, 3, 4, 5, 6, 7, 8].map((dayIndex) => {
                   const dayItems = mappedRows.filter((item) => item.dayIndex === dayIndex);
                   const dateFromData = dayItems.find((x) => x.date)?.date || "";
                   return {

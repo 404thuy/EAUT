@@ -1401,7 +1401,7 @@ html.light-theme .week-grid-wrap {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 900px;
+  min-width: 1020px;
   table-layout: fixed;
   border: none !important;
 }
