@@ -10,7 +10,7 @@ const isServerless =
 
 // ─── Cache Management & Change Detection ──────────────────────────────
 const scheduleCache = new Map();
-const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours TTL
+const CACHE_TTL = 48 * 60 * 60 * 1000; // 48 hours TTL (giữ cache lâu hơn, tăng tốc độ)
 
 const CACHE_DIR = isServerless ? path.join("/tmp", "eaut_cache") : path.join(process.cwd(), ".cache");
 try {
@@ -131,7 +131,7 @@ async function getBrowser() {
 
           const CHROMIUM_PACK_URL =
             process.env.CHROMIUM_PACK_URL ||
-            "https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.tar";
+            "https://github.com/Sparticuz/chromium/releases/download/v123.0.1/chromium-v123.0.1-pack.tar";
 
           let executablePath;
           const defaultBin = path.join(process.cwd(), "node_modules", "@sparticuz", "chromium", "bin");
@@ -1534,28 +1534,32 @@ async function prefetchAllStudentData(username, password, options = {}) {
       setCache(weeklyKey, weeklyResult);
       setCache(cacheKey(username, "weekly", { preferredWeek, preferredSemester, strictWeek: !strictWeek }), weeklyResult);
 
-      // 2. Fetch & Cache Term Schedule
-      try {
-        const termResult = await fetchTermScheduleInternal(page, username, studentName, { fetchAll: true });
-        setCache(cacheKey(username, "term", { fetchAll: false, preferredSemester: "" }), termResult);
-        setCache(cacheKey(username, "term", { fetchAll: true, preferredSemester: "" }), termResult);
-        setCache(cacheKey(username, "term", { fetchAll: false, preferredSemester: "all" }), termResult);
-        setCache(cacheKey(username, "term", { fetchAll: true, preferredSemester: "all" }), termResult);
-        console.log(`[PREFETCH BATCH] Term schedule cached successfully for ${username}`);
-      } catch (err) {
-        console.error("[PREFETCH TERM ERROR]", err.message);
-      }
+      // Trên serverless (Vercel), chỉ cào lịch tuần trước để trả về ngay tránh timeout 15s.
+      // Lịch kỳ và thi sẽ được cào độc lập khi người dùng chuyển tab.
+      if (!isServerless) {
+        // 2. Fetch & Cache Term Schedule
+        try {
+          const termResult = await fetchTermScheduleInternal(page, username, studentName, { fetchAll: true });
+          setCache(cacheKey(username, "term", { fetchAll: false, preferredSemester: "" }), termResult);
+          setCache(cacheKey(username, "term", { fetchAll: true, preferredSemester: "" }), termResult);
+          setCache(cacheKey(username, "term", { fetchAll: false, preferredSemester: "all" }), termResult);
+          setCache(cacheKey(username, "term", { fetchAll: true, preferredSemester: "all" }), termResult);
+          console.log(`[PREFETCH BATCH] Term schedule cached successfully for ${username}`);
+        } catch (err) {
+          console.error("[PREFETCH TERM ERROR]", err.message);
+        }
 
-      // 3. Fetch & Cache Exam Schedule
-      try {
-        const examResult = await fetchExamScheduleInternal(page, username, studentName, { fetchAll: true, preferredSemester: "all" });
-        setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "all" }), examResult);
-        setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "" }), examResult);
-        setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "all" }), examResult);
-        setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "" }), examResult);
-        console.log(`[PREFETCH BATCH] Exam schedule cached successfully for ${username}`);
-      } catch (err) {
-        console.error("[PREFETCH EXAM ERROR]", err.message);
+        // 3. Fetch & Cache Exam Schedule
+        try {
+          const examResult = await fetchExamScheduleInternal(page, username, studentName, { fetchAll: true, preferredSemester: "all" });
+          setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "all" }), examResult);
+          setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "" }), examResult);
+          setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "all" }), examResult);
+          setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "" }), examResult);
+          console.log(`[PREFETCH BATCH] Exam schedule cached successfully for ${username}`);
+        } catch (err) {
+          console.error("[PREFETCH EXAM ERROR]", err.message);
+        }
       }
 
       return weeklyResult;

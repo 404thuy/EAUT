@@ -83,7 +83,7 @@ app.post("/schedule", async (req, res) => {
     const result = await prefetchAllStudentData(formData.username, formData.password, {
       preferredWeek: req.body.week || null,
       strictWeek: false,
-      useCache: false, // Force fresh crawl per account on login!
+      useCache: !req.body.refresh, // Ưu tiên dùng cache nếu có để phản hồi tức thì
     });
 
     req.session.studentLogin = {

@@ -12,10 +12,11 @@
         "includeFiles": [
           "views/**",
           "public/**",
-          "services/**"
+          "services/**",
+          "node_modules/@sparticuz/chromium/bin/**"
         ],
         "maxDuration": 60,
-        "memory": 3008
+        "memory": 1024
       }
     }
   ],
