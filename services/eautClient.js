@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { callEautApi, tryDirectLogin, encryptPayload, decryptResponse } = require("./eautApi");
 
 const isServerless =
   process.env.VERCEL === "1" ||
@@ -389,6 +390,25 @@ async function createAuthenticatedPage(username, password) {
         return "";
       });
 
+      // 2b. Trích xuất thông tin session (iM, userId, cookie) để tăng tốc gọi API trực tiếp
+      try {
+        const sessionData = await page.evaluate(() => ({
+          userId: window.edu?.system?.userId || "",
+          iM: window.edu?.system?.iM || "",
+        }));
+        const browserCookies = await page.cookies();
+        const cookieHeader = browserCookies.map((c) => `${c.name}=${c.value}`).join("; ");
+        page._sessionInfo = {
+          iM: sessionData.iM,
+          userId: sessionData.userId,
+          cookieHeader,
+          studentName,
+        };
+        console.log(`[API ACCEL] Extracted iM and cookies for direct API calls (userId: ${sessionData.userId})`);
+      } catch (eSession) {
+        console.warn(`[API ACCEL] Failed to extract session for direct API: ${eSession.message}`);
+      }
+
       // 3. Enable request interception AFTER authentication to speed up data scraping
       await setupPageInterception(page);
 
@@ -416,9 +436,31 @@ async function createAuthenticatedPage(username, password) {
   }
 }
 
-// ─── Helper: Call SPA internal API via page.evaluate ───────────────────
+// ─── Helper: Call SPA internal API (Direct Web API with SPA Fallback) ──
 async function callSPAApi(page, apiAction, apiFunc, params = {}) {
-  // Ensure the page has the SPA framework initialized
+  // 1. Tối ưu: Thử gọi trực tiếp qua Direct Web API (tốc độ ~100-200ms)
+  if (page && page._sessionInfo && page._sessionInfo.iM && page._sessionInfo.cookieHeader) {
+    try {
+      const directResult = await callEautApi(
+        page._sessionInfo.cookieHeader,
+        page._sessionInfo.iM,
+        apiAction,
+        apiFunc,
+        {
+          strQLSV_NguoiHoc_Id: page._sessionInfo.userId,
+          strNguoiThucHien_Id: page._sessionInfo.userId,
+          ...params,
+        }
+      );
+      if (directResult && directResult.Success) {
+        return directResult;
+      }
+    } catch (e) {
+      console.warn(`[API ACCEL] Direct API fallback to SPA page.evaluate for ${apiAction}: ${e.message}`);
+    }
+  }
+
+  // 2. Fallback: Ensure the page has the SPA framework initialized
   const isReady = await page.waitForFunction(
     () => window.edu && window.edu.system && typeof window.edu.system.makeRequest === "function",
     { timeout: 12000 }
@@ -1680,4 +1722,8 @@ module.exports = {
   getStudentTermSchedule,
   getStudentExamSchedule,
   prefetchAllStudentData,
+  callEautApi,
+  tryDirectLogin,
+  encryptPayload,
+  decryptResponse,
 };
