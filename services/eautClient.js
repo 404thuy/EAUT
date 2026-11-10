@@ -1,7 +1,18 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { callEautApi, tryDirectLogin, encryptPayload, decryptResponse } = require("./eautApi");
+const {
+  callEautApi,
+  tryDirectLogin,
+  encryptPayload,
+  decryptResponse,
+  getUserSession,
+  saveUserSession,
+  clearUserSession,
+  fetchWeeklyScheduleDirect,
+  fetchTermScheduleDirect,
+  fetchExamScheduleDirect,
+} = require("./eautApi");
 
 const isServerless =
   process.env.VERCEL === "1" ||
@@ -404,7 +415,8 @@ async function createAuthenticatedPage(username, password) {
           cookieHeader,
           studentName,
         };
-        console.log(`[API ACCEL] Extracted iM and cookies for direct API calls (userId: ${sessionData.userId})`);
+        saveUserSession(username, page._sessionInfo);
+        console.log(`[API ACCEL] Extracted and cached session for direct API calls (userId: ${sessionData.userId})`);
       } catch (eSession) {
         console.warn(`[API ACCEL] Failed to extract session for direct API: ${eSession.message}`);
       }
@@ -1623,6 +1635,25 @@ async function getStudentSchedule(username, password, options = {}) {
     if (cached) return cached;
   }
 
+  // ─── Tăng tốc: Nếu đã có session, gọi trực tiếp Web API trong ~150ms mà không mở Chromium! ───
+  const activeSession = getUserSession(username);
+  if (activeSession && activeSession.iM && activeSession.cookieHeader) {
+    try {
+      console.log(`[API ACCEL] Calling Direct Web API for ${username} (weekly schedule)...`);
+      const directResult = await fetchWeeklyScheduleDirect(activeSession, username, options);
+      if (directResult) {
+        setCache(key, directResult);
+        if (!preferredWeek && !preferredSemester) {
+          setCache(keyAlt, directResult);
+        }
+        return directResult;
+      }
+    } catch (e) {
+      console.warn(`[API ACCEL] Direct weekly API failed (${e.message}), clearing session and falling back to browser.`);
+      clearUserSession(username);
+    }
+  }
+
   return enqueueTask(async () => {
     let browserContext, page, studentName;
     try {
@@ -1658,6 +1689,26 @@ async function getStudentTermSchedule(username, password, options = {}) {
       getFromCache(falseAllKey);
     if (cached) {
       return filterResultsBySemester(cached, preferredSemester);
+    }
+  }
+
+  // ─── Tăng tốc: Nếu đã có session, gọi trực tiếp Web API học kỳ trong ~250ms! ───
+  const activeTermSession = getUserSession(username);
+  if (activeTermSession && activeTermSession.iM && activeTermSession.cookieHeader) {
+    try {
+      console.log(`[API ACCEL] Calling Direct Web API for ${username} (term schedule)...`);
+      const directResult = await fetchTermScheduleDirect(activeTermSession, username, options);
+      if (directResult) {
+        setCache(specificKey, directResult);
+        setCache(generalKey, directResult);
+        setCache(allKey, directResult);
+        setCache(falseEmptyKey, directResult);
+        setCache(falseAllKey, directResult);
+        return filterResultsBySemester(directResult, preferredSemester);
+      }
+    } catch (e) {
+      console.warn(`[API ACCEL] Direct term API failed (${e.message}), clearing session and falling back.`);
+      clearUserSession(username);
     }
   }
 
@@ -1697,6 +1748,26 @@ async function getStudentExamSchedule(username, password, options = {}) {
       getFromCache(falseEmptyKey);
     if (cached) {
       return filterResultsBySemester(cached, preferredSemester);
+    }
+  }
+
+  // ─── Tăng tốc: Nếu đã có session, gọi trực tiếp Web API lịch thi trong ~200ms (Không bao giờ bị lỗi 500 Vercel!) ───
+  const activeExamSession = getUserSession(username);
+  if (activeExamSession && activeExamSession.iM && activeExamSession.cookieHeader) {
+    try {
+      console.log(`[API ACCEL] Calling Direct Web API for ${username} (exam schedule)...`);
+      const directResult = await fetchExamScheduleDirect(activeExamSession, username, options);
+      if (directResult) {
+        setCache(specificKey, directResult);
+        setCache(generalKey, directResult);
+        setCache(emptyKey, directResult);
+        setCache(falseAllKey, directResult);
+        setCache(falseEmptyKey, directResult);
+        return filterResultsBySemester(directResult, preferredSemester);
+      }
+    } catch (e) {
+      console.warn(`[API ACCEL] Direct exam API failed (${e.message}), clearing session and falling back.`);
+      clearUserSession(username);
     }
   }
 
