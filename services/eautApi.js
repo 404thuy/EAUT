@@ -1,8 +1,9 @@
 /**
  * services/eautApi.js
  * 
- * Module tích hợp trực tiếp Web API của Cổng thông tin Đào tạo EAUT (APIS).
- * Bỏ qua overhead khởi động trình duyệt Puppeteer, giảm thời gian phản hồi từ ~15s xuống ~150ms.
+ * Module tích hợp toàn diện Web API của Cổng thông tin Đào tạo EAUT (APIS).
+ * Bỏ qua toàn bộ overhead khởi động trình duyệt Puppeteer (~20s),
+ * tăng tốc độ truy xuất lịch học, lịch thi, lịch học kỳ từ ~20s xuống ~150ms-250ms.
  */
 
 const fs = require("fs");
@@ -40,7 +41,7 @@ const DEFAULT_HEADERS = {
 
 /**
  * Mã hóa payload gửi lên API (Hàm AE từ crypto-js.js của EAUT)
- * XOR từng ký tự với key (action suffix), sau đó mã hóa Base64.
+ * XOR từng ký tự UTF-8 với action suffix, sau đó mã hóa Base64.
  *
  * @param {string} rawJsonStr
  * @param {string} actionKey Ví dụ: "DSA4BRINKCIpAiAPKSAv"
@@ -53,7 +54,7 @@ function encryptPayload(rawJsonStr, actionKey) {
     const xorCode = rawJsonStr.charCodeAt(i) ^ actionKey[i % actionKey.length].charCodeAt(0);
     chars.push(String.fromCharCode(xorCode));
   }
-  return Buffer.from(chars.join(""), "binary").toString("base64");
+  return Buffer.from(chars.join(""), "utf8").toString("base64");
 }
 
 /**
@@ -66,7 +67,7 @@ function encryptPayload(rawJsonStr, actionKey) {
  */
 function decryptResponse(encryptedB, iM) {
   if (!encryptedB || !iM) return "";
-  const decoded = Buffer.from(encryptedB, "base64").toString("binary");
+  const decoded = Buffer.from(encryptedB, "base64").toString("utf8");
   const chars = [];
   for (let i = 0; i < decoded.length; i++) {
     const xorCode = decoded.charCodeAt(i) ^ iM[i % iM.length].charCodeAt(0);
@@ -131,6 +132,13 @@ function clearUserSession(username) {
 
 /**
  * Gọi trực tiếp API nội bộ của EAUT
+ *
+ * @param {string} cookieHeader Cookie phiên (ASP.NET_SessionId, .ASPXAUTH...)
+ * @param {string} iM Token định danh sinh viên
+ * @param {string} action Action path, ví dụ "SV_ThongTin_MH/DSA4BRINKCIpAiAPKSAv"
+ * @param {string} func Tên procedure PL/SQL
+ * @param {object} params Tham số nghiệp vụ
+ * @returns {Promise<any>}
  */
 async function callEautApi(cookieHeader, iM, action, func, params = {}) {
   const actionKey = action.substring(action.indexOf("/") + 1);
@@ -186,6 +194,10 @@ async function callEautApi(cookieHeader, iM, action, func, params = {}) {
 
 // ─── 4. Đăng nhập HTTP thuần (không cần mở browser) ─────────────────────────
 
+/**
+ * Thử đăng nhập trực tiếp qua POST form WebForms
+ * @returns {Promise<{ cookieHeader: string, iM: string, userId: string, studentName: string } | null>}
+ */
 async function tryDirectLogin(username, password) {
   try {
     const jar = new CookieJar();
@@ -213,7 +225,7 @@ async function tryDirectLogin(username, password) {
     formData.append("password", password);
     formData.append("cms_authenticate_do_login", "ĐĂNG NHẬP");
 
-    await client.post(`${BASE_URL}/login.aspx`, formData.toString(), {
+    const postResp = await client.post(`${BASE_URL}/login.aspx`, formData.toString(), {
       headers: {
         ...DEFAULT_HEADERS,
         "Content-Type": "application/x-www-form-urlencoded",
@@ -222,6 +234,14 @@ async function tryDirectLogin(username, password) {
       },
       maxRedirects: 5,
     });
+
+    // Kiểm tra thông báo lỗi trên trang đăng nhập
+    const $post = cheerio.load(postResp.data);
+    const errText = $post("#lblNotify, #lblError, .text-danger").text().trim();
+    if (errText && errText !== "NO") {
+      console.warn(`[EAUT API] Direct login rejected: ${errText}`);
+      return null;
+    }
 
     const indexResp = await client.get(`${BASE_URL}/Index.aspx`, {
       headers: DEFAULT_HEADERS,
@@ -236,7 +256,7 @@ async function tryDirectLogin(username, password) {
     const studentName =
       $index("#lblHoTenNguoiDangNhap").text().trim() ||
       $index(".nav-account button > span").text().trim() ||
-      "";
+      username;
 
     let userId = username;
     const userIdMatch =
@@ -247,9 +267,9 @@ async function tryDirectLogin(username, password) {
 
     let iM = null;
     const iMPatterns = [
+      /[A-Za-z0-9_]+\s*=\s*\(\)\s*=>\s*["']([^'"]{30,})["']/i,
       /edu\.system\.iM\s*=\s*['"]([^'"]+)['"]/i,
       /iM\s*[:=]\s*['"]([A-Za-z0-9+/=]{20,})['"]/,
-      /[A-Za-z0-9_]+\s*=\s*\(\)\s*=>\s*["']([^"']+)["']/i,
       /["']iM["']\s*:\s*["']([^'"]{20,})["']/,
     ];
     for (const pat of iMPatterns) {
@@ -272,6 +292,7 @@ async function tryDirectLogin(username, password) {
       studentName,
     };
     saveUserSession(username, sessionData);
+    console.log(`[EAUT API] Direct HTTP login successful for ${username} (userId: ${userId})`);
     return sessionData;
   } catch (err) {
     console.warn("[EAUT API] Direct HTTP login attempt failed:", err.message);
@@ -290,7 +311,7 @@ function formatDate(d) {
 
 function parseDDMMYYYY(str) {
   if (!str) return null;
-  const parts = str.split("/");
+  const parts = String(str).split("/");
   if (parts.length !== 3) return null;
   return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
 }
@@ -301,8 +322,10 @@ function getWeekRange(referenceDate) {
   const diffToMon = day === 0 ? -6 : 1 - day;
   const monday = new Date(d);
   monday.setDate(d.getDate() + diffToMon);
+  monday.setHours(0, 0, 0, 0);
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
   return { start: monday, end: sunday };
 }
 
@@ -367,54 +390,143 @@ function inferSemesterFromDate(dateStr, fallbackSemLabel, classCode = "") {
 // ─── 6. Fast Direct API Fetchers (Không cần Puppeteer) ──────────────────────
 
 /**
- * Lấy lịch tuần trực tiếp qua API EAUT (~150ms)
+ * Lấy lịch tuần trực tiếp qua API EAUT (~150ms).
+ * Tự động tìm tuần có lịch học gần nhất khi tuần hiện tại không có buổi học nào,
+ * giúp người dùng không bao giờ bị rơi vào màn hình bảng trắng rỗng.
  */
 async function fetchWeeklyScheduleDirect(session, username, options = {}) {
   const preferredWeek = options.preferredWeek || null;
   const preferredSemester = options.preferredSemester || null;
+  const strictWeek = Boolean(options.strictWeek);
 
-  let weekStart, weekEnd;
+  let targetWeekStart, targetWeekEnd;
   if (preferredWeek) {
     const parsed = parseDDMMYYYY(preferredWeek);
     if (parsed) {
       const range = getWeekRange(parsed);
-      weekStart = range.start;
-      weekEnd = range.end;
+      targetWeekStart = range.start;
+      targetWeekEnd = range.end;
     }
   }
-  if (!weekStart) {
+  if (!targetWeekStart) {
     const range = getWeekRange(new Date());
-    weekStart = range.start;
-    weekEnd = range.end;
+    targetWeekStart = range.start;
+    targetWeekEnd = range.end;
   }
 
-  const startStr = formatDate(weekStart);
-  const endStr = formatDate(weekEnd);
+  // 1. Luôn truy vấn một khoảng thời gian mở rộng (từ -28 ngày đến +35 ngày)
+  // để lấy trọn danh sách các buổi học xung quanh tuần hiện tại trong 1 lần gọi API duy nhất (~150ms)
+  const windowStart = new Date(targetWeekStart);
+  windowStart.setDate(windowStart.getDate() - 28);
+  const windowEnd = new Date(targetWeekEnd);
+  windowEnd.setDate(windowEnd.getDate() + 35);
 
   const action = "SV_ThongTin_MH/DSA4BRINKCIpAiAPKSAv";
   const func = "pkg_congthongtin_hssv_thongtin.LayDSLichCaNhan";
 
-  const apiRes = await callEautApi(
-    session.cookieHeader,
-    session.iM,
-    action,
-    func,
-    {
-      strQLSV_NguoiHoc_Id: session.userId,
-      strNgayBatDau: startStr,
-      strNgayKetThuc: endStr,
+  let scheduleItems = [];
+  try {
+    const apiRes = await callEautApi(
+      session.cookieHeader,
+      session.iM,
+      action,
+      func,
+      {
+        strQLSV_NguoiHoc_Id: session.userId,
+        strNgayBatDau: formatDate(windowStart),
+        strNgayKetThuc: formatDate(windowEnd),
+      }
+    );
+    if (apiRes && apiRes.Success && Array.isArray(apiRes.Data)) {
+      scheduleItems = apiRes.Data.filter((e) => e && e.PHANLOAI !== "LICHTHI");
     }
-  );
+  } catch (err) {
+    console.warn(`[EAUT API] Window fetch failed (${err.message}), trying exact week query.`);
+    // Fallback: truy vấn đúng tuần được yêu cầu
+    const apiResExact = await callEautApi(
+      session.cookieHeader,
+      session.iM,
+      action,
+      func,
+      {
+        strQLSV_NguoiHoc_Id: session.userId,
+        strNgayBatDau: formatDate(targetWeekStart),
+        strNgayKetThuc: formatDate(targetWeekEnd),
+      }
+    );
+    if (apiResExact && apiResExact.Success && Array.isArray(apiResExact.Data)) {
+      scheduleItems = apiResExact.Data.filter((e) => e && e.PHANLOAI !== "LICHTHI");
+    }
+  }
 
-  const allItems = (apiRes && apiRes.Success && Array.isArray(apiRes.Data)) ? apiRes.Data : [];
-  const scheduleItems = allItems.filter((e) => e && e.PHANLOAI !== "LICHTHI");
+  // 2. Thống kê số buổi học theo từng tuần
+  const weekCountMap = new Map(); // key: "DD/MM/YYYY" (Monday) -> count
+  for (const item of scheduleItems) {
+    const dateParsed = parseDDMMYYYY(item.NGAYHOC);
+    if (dateParsed) {
+      const wRange = getWeekRange(dateParsed);
+      const wKey = formatDate(wRange.start);
+      weekCountMap.set(wKey, (weekCountMap.get(wKey) || 0) + 1);
+    }
+  }
+
+  // 3. Kiểm tra xem tuần được yêu cầu có buổi học nào không
+  const targetWeekKey = formatDate(targetWeekStart);
+  let activeWeekStart = targetWeekStart;
+  let activeWeekEnd = targetWeekEnd;
+  let autoSwitchedWeek = false;
+
+  // Nếu người dùng không chỉ định đích danh 1 tuần cụ thể (hoặc !strictWeek)
+  // và tuần hiện tại không có môn nào, hãy tự động chọn tuần có lịch học gần nhất
+  if (!preferredWeek && !strictWeek && (weekCountMap.get(targetWeekKey) || 0) === 0) {
+    let closestWeekKey = null;
+    let minDiff = Infinity;
+    const nowTime = targetWeekStart.getTime();
+
+    for (const [wKey, count] of weekCountMap.entries()) {
+      if (count > 0) {
+        const wDate = parseDDMMYYYY(wKey);
+        if (wDate) {
+          const diff = Math.abs(wDate.getTime() - nowTime);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestWeekKey = wKey;
+          }
+        }
+      }
+    }
+
+    if (closestWeekKey) {
+      const parsedClosest = parseDDMMYYYY(closestWeekKey);
+      if (parsedClosest) {
+        const cRange = getWeekRange(parsedClosest);
+        activeWeekStart = cRange.start;
+        activeWeekEnd = cRange.end;
+        autoSwitchedWeek = true;
+        console.log(`[EAUT API] Auto-switched to active week: ${formatDate(activeWeekStart)} - ${formatDate(activeWeekEnd)}`);
+      }
+    }
+  }
+
+  // 4. Lọc các buổi học thuộc tuần active
+  const startStr = formatDate(activeWeekStart);
+  const endStr = formatDate(activeWeekEnd);
+  const activeStartMs = activeWeekStart.getTime();
+  const activeEndMs = activeWeekEnd.getTime();
+
+  const activeWeekItems = scheduleItems.filter((item) => {
+    const d = parseDDMMYYYY(item.NGAYHOC);
+    if (!d) return false;
+    const t = d.getTime();
+    return t >= activeStartMs && t <= activeEndMs;
+  });
 
   const headers = [
     "Thu", "Ngay", "Mon hoc", "Phong", "Giang vien",
     "Tiet bat dau", "So tiet", "Gio hoc", "Ca hoc", "Ma lop", "Hinh thuc hoc",
   ];
 
-  const rows = scheduleItems.map((item) => {
+  const rows = activeWeekItems.map((item) => {
     const pad = (n) => String(n || 0).padStart(2, "0");
     const ngay = item.NGAYHOC || "";
     const thu = getDayOfWeek(ngay);
@@ -456,15 +568,23 @@ async function fetchWeeklyScheduleDirect(session, username, options = {}) {
     return (parseInt(a[5]) || 0) - (parseInt(b[5]) || 0);
   });
 
+  // 5. Tạo danh sách tuần học trong dropdown (từ -4 tuần đến +6 tuần)
   const weekOptions = [];
-  for (let i = -4; i <= 4; i++) {
-    const wStart = new Date(weekStart);
+  const referenceMonday = getWeekRange(new Date()).start;
+
+  for (let i = -4; i <= 6; i++) {
+    const wStart = new Date(referenceMonday);
     wStart.setDate(wStart.getDate() + i * 7);
     const wEnd = new Date(wStart);
     wEnd.setDate(wStart.getDate() + 6);
-    const label = `${formatDate(wStart)} - ${formatDate(wEnd)}`;
-    const value = formatDate(wStart);
-    weekOptions.push({ label, value, selected: i === 0 });
+
+    const valStr = formatDate(wStart);
+    const count = weekCountMap.get(valStr) || 0;
+    const badge = count > 0 ? ` (${count} buổi)` : "";
+    const label = `${formatDate(wStart)} - ${formatDate(wEnd)}${badge}`;
+    const selected = valStr === startStr;
+
+    weekOptions.push({ label, value: valStr, selected });
   }
 
   return {
@@ -476,7 +596,8 @@ async function fetchWeeklyScheduleDirect(session, username, options = {}) {
     weekOptions,
     semesterOptions: session.semesterOptions || [],
     selectedSemesterValue: preferredSemester || null,
-    autoSwitchedWeek: false,
+    autoSwitchedWeek,
+    originalWeekLabel: `${formatDate(targetWeekStart)} - ${formatDate(targetWeekEnd)}`,
     headers,
     rows,
     studentName: session.studentName || username,

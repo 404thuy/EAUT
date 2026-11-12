@@ -1577,45 +1577,76 @@ async function prefetchAllStudentData(username, password, options = {}) {
     if (cachedWeekly) return cachedWeekly;
   }
 
-  return enqueueTask(async () => {
-    let browserContext, page, studentName;
+  // 1. Thử dùng direct session từ options hoặc cache
+  let activeSession = options.session || getUserSession(username);
+
+  // 2. Nếu chưa có session, thử đăng nhập trực tiếp qua HTTP thuần (siêu nhanh ~300ms)
+  if (!activeSession) {
     try {
-      console.log(`[PREFETCH BATCH] Logging in once in isolated context for ${username}...`);
-      ({ browserContext, page, studentName } = await createAuthenticatedPage(username, password));
+      activeSession = await tryDirectLogin(username, password);
+    } catch (e) {}
+  }
 
-      // 1. Fetch Weekly Schedule
-      const weeklyResult = await fetchWeeklyScheduleInternal(page, username, studentName, options);
-      setCache(weeklyKey, weeklyResult);
-      setCache(cacheKey(username, "weekly", { preferredWeek, preferredSemester, strictWeek: !strictWeek }), weeklyResult);
+  // 3. Nếu đã có activeSession, gọi trực tiếp Web API cho CẢ 3 LỊCH SONG SONG (~200ms)
+  if (activeSession && activeSession.iM && activeSession.cookieHeader) {
+    try {
+      console.log(`[API ACCEL] prefetchAllStudentData via Direct API for ${username}...`);
+      const [weeklyResult, termResult, examResult] = await Promise.all([
+        fetchWeeklyScheduleDirect(activeSession, username, options),
+        fetchTermScheduleDirect(activeSession, username, { fetchAll: true }).catch(() => null),
+        fetchExamScheduleDirect(activeSession, username, { fetchAll: true }).catch(() => null),
+      ]);
 
-      // Trên serverless (Vercel), chỉ cào lịch tuần trước để trả về ngay tránh timeout 15s.
-      // Lịch kỳ và thi sẽ được cào độc lập khi người dùng chuyển tab.
-      if (!isServerless) {
-        // 2. Fetch & Cache Term Schedule
-        try {
-          const termResult = await fetchTermScheduleInternal(page, username, studentName, { fetchAll: true });
+      if (weeklyResult) {
+        setCache(weeklyKey, weeklyResult);
+        setCache(cacheKey(username, "weekly", { preferredWeek, preferredSemester, strictWeek: !strictWeek }), weeklyResult);
+        if (termResult) {
           setCache(cacheKey(username, "term", { fetchAll: false, preferredSemester: "" }), termResult);
           setCache(cacheKey(username, "term", { fetchAll: true, preferredSemester: "" }), termResult);
           setCache(cacheKey(username, "term", { fetchAll: false, preferredSemester: "all" }), termResult);
           setCache(cacheKey(username, "term", { fetchAll: true, preferredSemester: "all" }), termResult);
-          console.log(`[PREFETCH BATCH] Term schedule cached successfully for ${username}`);
-        } catch (err) {
-          console.error("[PREFETCH TERM ERROR]", err.message);
         }
-
-        // 3. Fetch & Cache Exam Schedule
-        try {
-          const examResult = await fetchExamScheduleInternal(page, username, studentName, { fetchAll: true, preferredSemester: "all" });
+        if (examResult) {
           setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "all" }), examResult);
           setCache(cacheKey(username, "exam", { fetchAll: true, preferredSemester: "" }), examResult);
           setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "all" }), examResult);
           setCache(cacheKey(username, "exam", { fetchAll: false, preferredSemester: "" }), examResult);
-          console.log(`[PREFETCH BATCH] Exam schedule cached successfully for ${username}`);
-        } catch (err) {
-          console.error("[PREFETCH EXAM ERROR]", err.message);
         }
+        weeklyResult.sessionInfo = activeSession;
+        return weeklyResult;
+      }
+    } catch (e) {
+      console.warn(`[API ACCEL] Direct batch prefetch failed (${e.message}), falling back to browser.`);
+    }
+  }
+
+  return enqueueTask(async () => {
+    let browserContext, page, studentName;
+    try {
+      console.log(`[PREFETCH BATCH] Logging in via Puppeteer fallback for ${username}...`);
+      ({ browserContext, page, studentName } = await createAuthenticatedPage(username, password));
+      activeSession = page._sessionInfo || getUserSession(username);
+
+      // Nếu đã trích xuất được session từ Puppeteer, ưu tiên gọi API trực tiếp lấy lịch ngay
+      if (activeSession && activeSession.iM && activeSession.cookieHeader) {
+        try {
+          const [weeklyResult, termResult, examResult] = await Promise.all([
+            fetchWeeklyScheduleDirect(activeSession, username, options),
+            fetchTermScheduleDirect(activeSession, username, { fetchAll: true }).catch(() => null),
+            fetchExamScheduleDirect(activeSession, username, { fetchAll: true }).catch(() => null),
+          ]);
+          if (weeklyResult) {
+            setCache(weeklyKey, weeklyResult);
+            weeklyResult.sessionInfo = activeSession;
+            return weeklyResult;
+          }
+        } catch (e) {}
       }
 
+      // Fallback cào DOM truyền thống
+      const weeklyResult = await fetchWeeklyScheduleInternal(page, username, studentName, options);
+      setCache(weeklyKey, weeklyResult);
+      weeklyResult.sessionInfo = activeSession;
       return weeklyResult;
     } finally {
       await cleanupPage(page, browserContext);
@@ -1636,7 +1667,7 @@ async function getStudentSchedule(username, password, options = {}) {
   }
 
   // ─── Tăng tốc: Nếu đã có session, gọi trực tiếp Web API trong ~150ms mà không mở Chromium! ───
-  const activeSession = getUserSession(username);
+  const activeSession = options.session || getUserSession(username);
   if (activeSession && activeSession.iM && activeSession.cookieHeader) {
     try {
       console.log(`[API ACCEL] Calling Direct Web API for ${username} (weekly schedule)...`);
@@ -1693,7 +1724,7 @@ async function getStudentTermSchedule(username, password, options = {}) {
   }
 
   // ─── Tăng tốc: Nếu đã có session, gọi trực tiếp Web API học kỳ trong ~250ms! ───
-  const activeTermSession = getUserSession(username);
+  const activeTermSession = options.session || getUserSession(username);
   if (activeTermSession && activeTermSession.iM && activeTermSession.cookieHeader) {
     try {
       console.log(`[API ACCEL] Calling Direct Web API for ${username} (term schedule)...`);
@@ -1752,7 +1783,7 @@ async function getStudentExamSchedule(username, password, options = {}) {
   }
 
   // ─── Tăng tốc: Nếu đã có session, gọi trực tiếp Web API lịch thi trong ~200ms (Không bao giờ bị lỗi 500 Vercel!) ───
-  const activeExamSession = getUserSession(username);
+  const activeExamSession = options.session || getUserSession(username);
   if (activeExamSession && activeExamSession.iM && activeExamSession.cookieHeader) {
     try {
       console.log(`[API ACCEL] Calling Direct Web API for ${username} (exam schedule)...`);

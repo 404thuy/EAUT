@@ -80,10 +80,12 @@ app.post("/schedule", async (req, res) => {
   }
 
   try {
+    const existingSession = req.session?.eautSession?.username === formData.username ? req.session.eautSession : null;
     const result = await prefetchAllStudentData(formData.username, formData.password, {
       preferredWeek: req.body.week || null,
       strictWeek: false,
       useCache: !req.body.refresh, // Ưu tiên dùng cache nếu có để phản hồi tức thì
+      session: existingSession,
     });
 
     req.session.studentLogin = {
@@ -91,6 +93,9 @@ app.post("/schedule", async (req, res) => {
       password: formData.password,
       studentName: result.studentName
     };
+    if (result.sessionInfo) {
+      req.session.eautSession = result.sessionInfo;
+    }
 
     return res.redirect("/schedule/week");
   } catch (error) {
@@ -126,9 +131,12 @@ app.get("/schedule/week", async (req, res) => {
     const result = await getStudentSchedule(saved.username, saved.password, {
       preferredWeek: selectedWeek,
       preferredSemester: selectedSemester,
-      strictWeek: true,
+      strictWeek: Boolean(selectedWeek),
       useCache: !req.query.refresh,
+      session: req.session?.eautSession,
     });
+    if (result.sessionInfo) req.session.eautSession = result.sessionInfo;
+
     return res.render("index", {
       error: null,
       result: { ...result, viewType: "week" },
@@ -158,7 +166,10 @@ app.get("/schedule/term", async (req, res) => {
       preferredSemester: isAll ? "" : selectedSemester,
       fetchAll: isAll,
       useCache: !req.query.refresh,
+      session: req.session?.eautSession,
     });
+    if (result.sessionInfo) req.session.eautSession = result.sessionInfo;
+
     return res.render("index", {
       error: null,
       result: { ...result, viewType: "term", selectedSemester },
@@ -189,12 +200,15 @@ app.get("/schedule/exam", async (req, res) => {
         preferredSemester: isAll ? "" : selectedSemester,
         fetchAll: isAll,
         useCache: !req.query.refresh,
+        session: req.session?.eautSession,
       }),
       getStudentTermSchedule(saved.username, saved.password, {
         fetchAll: true,
         useCache: true,
+        session: req.session?.eautSession,
       }).catch(() => null),
     ]);
+    if (result.sessionInfo) req.session.eautSession = result.sessionInfo;
 
     const creditsMap = {};
     if (termResult && Array.isArray(termResult.results)) {
@@ -239,8 +253,8 @@ app.get("/schedule/all", async (req, res) => {
     return res.redirect("/");
   }
   try {
-    const weeklyResult = await getStudentSchedule(saved.username, saved.password, { preferredWeek: null, strictWeek: false });
-    const termResult = await getStudentTermSchedule(saved.username, saved.password, { fetchAll: false });
+    const weeklyResult = await getStudentSchedule(saved.username, saved.password, { preferredWeek: null, strictWeek: false, session: req.session?.eautSession });
+    const termResult = await getStudentTermSchedule(saved.username, saved.password, { fetchAll: false, session: req.session?.eautSession });
     // Merge results into a single object
     const result = {
       viewType: "combined",
@@ -267,7 +281,8 @@ app.get("/api/schedule/prefetch-all", async (req, res) => {
     return res.status(401).json({ success: false, error: "Chưa đăng nhập" });
   }
   try {
-    const result = await prefetchAllStudentData(saved.username, saved.password);
+    const result = await prefetchAllStudentData(saved.username, saved.password, { session: req.session?.eautSession });
+    if (result.sessionInfo) req.session.eautSession = result.sessionInfo;
     return res.json({ success: true, message: "Đã tải ngầm và lưu trọn vẹn cả 3 lịch", result });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
@@ -287,9 +302,11 @@ app.get("/api/schedule/week", async (req, res) => {
     const result = await getStudentSchedule(saved.username, saved.password, {
       preferredWeek: selectedWeek,
       preferredSemester: selectedSemester,
-      strictWeek: true,
+      strictWeek: Boolean(selectedWeek),
       useCache: !req.query.refresh,
+      session: req.session?.eautSession,
     });
+    if (result.sessionInfo) req.session.eautSession = result.sessionInfo;
     return res.json({
       success: true,
       result: { ...result, viewType: "week" },
@@ -313,7 +330,9 @@ app.get("/api/schedule/term", async (req, res) => {
       preferredSemester: isAll ? "" : selectedSemester,
       fetchAll: isAll,
       useCache: !req.query.refresh,
+      session: req.session?.eautSession,
     });
+    if (result.sessionInfo) req.session.eautSession = result.sessionInfo;
     return res.json({
       success: true,
       result: { ...result, viewType: "term", selectedSemester },
@@ -338,12 +357,15 @@ app.get("/api/schedule/exam", async (req, res) => {
         preferredSemester: isAll ? "" : selectedSemester,
         fetchAll: isAll,
         useCache: !req.query.refresh,
+        session: req.session?.eautSession,
       }),
       getStudentTermSchedule(saved.username, saved.password, {
         fetchAll: true,
         useCache: true,
+        session: req.session?.eautSession,
       }).catch(() => null),
     ]);
+    if (result.sessionInfo) req.session.eautSession = result.sessionInfo;
 
     const creditsMap = {};
     if (termResult && Array.isArray(termResult.results)) {
@@ -378,6 +400,13 @@ app.get("/api/schedule/exam", async (req, res) => {
 });
 
 app.get("/logout", (req, res) => {
+  const user = req.session?.studentLogin?.username;
+  if (user) {
+    try {
+      const { clearUserSession } = require("./services/eautApi");
+      clearUserSession(user);
+    } catch (e) {}
+  }
   req.session = null;
   res.redirect("/");
 });
